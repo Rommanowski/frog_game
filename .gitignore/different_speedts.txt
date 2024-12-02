@@ -257,11 +257,11 @@ Car **CreateCars(int numroads)
     Car **cars = (Car **)malloc(numroads * sizeof(Car *));
     for(int i=0; i<numroads; ++i)
     {
-        //int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
+        int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
         cars[i] = (Car *)malloc(CARS_PER_LANE * sizeof(Car));
         for(int j=0; j<CARS_PER_LANE; ++j)
         {
-            int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
+            //int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
             int randomLength = RA(MIN_CAR_LEN, MAX_CAR_LEN);
             int randomHead = RA(j*MAP_WIDTH/CARS_PER_LANE, (j+1)*MAP_WIDTH/CARS_PER_LANE - randomLength);
             cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, 0, 0);
@@ -290,30 +290,28 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
 //car movement
 void MoveCar(WINDOW *win, Car *car, Player *p, Timer t)
 {
-    wattron(win, COLOR_PAIR(ROAD_COL));
-    // this loop reassures that when one car is (wyprzedza) another, there will be no blank space between them on screen
-    for(int i=car->head; i>car->head-car->length+1; --i)
-            if(i >= 0)
-                mvwaddch(win, car->lane, i, '>');
-
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
+        wattron(win, COLOR_PAIR(ROAD_COL));
         car->head += car->direction;
         //mvwaddch(win, car->lane, car->head-car->length, ' ');
-        if((mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT)  != '@')
-            mvwaddch(win, car->lane, car->head-car->length, ' ');
-        if(car -> head <= p->xMax + car->length)
-        {    
-            mvwaddch(win, car->lane, car->head, '>');
+        for(int i=car->head; i > car->head-car->length; --i)
+        {
+            mvwaddch(win, car->lane, i+1, '>');
+            mvwaddch(win, car->lane, i, ' ');
+            
         }
-        else
+        // for(int i=car->head - car->length + 1; i < car->head + 1; ++i)
+        // {
+        //     mvwaddch(win, car->lane, i, '>');
+        // }
+        if(car -> head > p->xMax + car->length)
         {
             car->head = -1;
         }
         car->lastFrameMoved = t.frame_n;
         wattroff(win, COLOR_PAIR(ROAD_COL));
     }
-    wrefresh(win);
 }
 
 
@@ -392,15 +390,6 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax)
 
         // these lines make colors of the map stay as they should be
         SetGoodColor(win, p);
-
-        if((mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT) == '>')
-        {
-            mvprintw(0, 0, "PRZEGRALES PRZEGRALES");
-            mvwaddch(win, p->yPos, p->xPos, p->symbol);
-            wrefresh(win);
-            usleep(1000*1000*2);
-        }
-
         mvwaddch(win, p->yPos, p->xPos, p->symbol);
         //RefreshWindow(win, 0, p->yMax, p->xMax);
         flushinp();         //to 'unclog' the input (so it does not stack up)
