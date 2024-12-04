@@ -16,14 +16,14 @@
 #define FRIENDLY_CAR_COL 5
 
 #define PLAYER_SYMBOL '@'
-#define Player_SPEED 1
+#define Player_SPEED 2
 #define ATTACH_KEY 'c'
 
 #define MIN_CAR_LEN 4
 #define MAX_CAR_LEN 6
 #define CARS_PER_LANE 6
 #define CAR_MIN_SPEED 1
-#define CAR_MAX_SPEED 4
+#define CAR_MAX_SPEED 2
 #define CAR_STOPS_PROB 2
 #define CAR_FRIENDLY_PROB 3
 #define REMOVE_CAR_PROB 3
@@ -178,6 +178,7 @@ void ClearWindow(WINDOW *win, int border, int yMax, int xMax)
             mvwaddch(win, i, j, ' ');
         }
     }
+    wrefresh(win);
 }
 
 void GameOver(WINDOW *win, Player *p, int border)
@@ -403,7 +404,7 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 {
             // MAKE IT A FUNCTION
     // attach player to the car i he presses a key and is close
-    if(car->isFriendly && (p->xPos == car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached)
+    if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached)
     {
         wattron(win, COLOR_PAIR(GRASS_COL));
         mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -648,8 +649,6 @@ int main()
     getmaxyx(levelwin, yMax, xMax);
     nodelay(levelwin, true);
     int numRoads = GenerateRoads(levelwin, 0, yMax, xMax);      //number of road lanes
-    refresh();
-    wrefresh(levelwin);
 
     Player player;
     player = CreatePlayer(yMax-2, xMax/2, yMax, xMax, PLAYER_SYMBOL);
@@ -668,8 +667,9 @@ int main()
             PlaceCar(levelwin, &cars[i][j], &player);
         }
     }
-
     mvprintw(0, 0,"FROG GAME IS WORKING!\nLEVEL %d", choice);
+    refresh();
+    wrefresh(levelwin);
     MainLoop(levelwin, &player, timer, cars, numRoads);
     //getch();
     endwin();
