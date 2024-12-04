@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define CONFIG_FNAME "config.txt"
+#define NUMLEVELS 4
 #define ENTER 10
 
 #define GRASS_COL 1
@@ -19,47 +19,12 @@
 #define Player_SPEED 2
 #define ATTACH_KEY 'c'
 
-#define MIN_CAR_LEN 4
-#define MAX_CAR_LEN 6
-#define CARS_PER_LANE 6
-#define CAR_MIN_SPEED 1
-#define CAR_MAX_SPEED 2
-#define CAR_STOPS_PROB 2
-#define CAR_FRIENDLY_PROB 3
-#define REMOVE_CAR_PROB 3
-
 #define PLAYWIN_Y 5
 #define PLAYWIN_X 10
-#define MAP_HEIGHT 25
-#define MAP_WIDTH 175
 
 #define FRAME_TIME 100       //MILISECONDS
 
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
-
-
-// READING / WRITING TO FILES
-
-void ReadLevelConfig(int *numlevels)
-{
-    FILE *f = fopen(CONFIG_FNAME, "r");
-    if( f == NULL)
-    {
-        printw("ERROR: config file not found! Check the name of CONFIG_FNAME");
-        endwin();
-        return;
-    }
-    int result = fscanf(f, "%*s%d", numlevels);     //skip the first string in a file input, since it's a variable name
-    // if(result != 1)
-    // {
-    //     printw("ERROR: Failed to read config file.");
-    //     endwin();
-    //     fclose(f);
-    //     return;
-    // }
-    fclose(f);
-}
-
 
 // GENERATING MAP (key)
 char *GenerateMap(int map_length, int grassprob, int bouncyprob)            // G -> grass
@@ -120,6 +85,19 @@ typedef struct{
     int index;
     int lastFrameMoved;         //frame at which the car has moved for the last time (used for changing car speeds)
 } Car;
+
+typedef struct{
+    int min_car_len;
+    int max_car_len;
+    int cars_per_lane;
+    int car_min_speed;
+    int car_max_speed;
+    int car_stops_prob;
+    int car_friendly_prob;
+    int remove_car_prob;
+    int map_height;
+    int map_width;
+} Level;
 
 // WINDOWS FUNCTIONS
 int GenerateRoads(WINDOW *win, int border, int yMax, int xMax)
@@ -208,9 +186,9 @@ void GameOver(WINDOW *win, Player *p, int border)
             wrefresh(win);
 }
 
-WINDOW *StartLevel(int choice)
+WINDOW *StartLevel(int choice, Level l)
 {
-    WINDOW *win = newwin(MAP_HEIGHT, MAP_WIDTH, PLAYWIN_Y, PLAYWIN_X);        //PLACEHOLDER VALUES
+    WINDOW *win = newwin(l.map_height, l.map_width, PLAYWIN_Y, PLAYWIN_X);        //PLACEHOLDER VALUES
     //box(win, 0, 0);
 
     init_pair(GRASS_COL, COLOR_WHITE, COLOR_GREEN);
@@ -314,12 +292,12 @@ Car CreateCar(int head, int lane, int length, int speed, int direction, int stop
     return car;
 }
 
-Car CreateRandomCar(int lane, int lastFrame, int index)
+Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
 {
-    int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
-    int randomLength = RA(MIN_CAR_LEN, MAX_CAR_LEN);
-    int randomNotStops = RA(0, CAR_STOPS_PROB)%CAR_STOPS_PROB;
-    int randomIsNotFriendly = RA(0, CAR_FRIENDLY_PROB)%CAR_FRIENDLY_PROB;
+    int randomSpeed = RA(l.car_min_speed, l.car_max_speed);
+    int randomLength = RA(l.min_car_len, l.max_car_len);
+    int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
+    int randomIsNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
     Car car;
     car.head = 0;
     car.lane = lane;
@@ -335,25 +313,42 @@ Car CreateRandomCar(int lane, int lastFrame, int index)
 }
 
 //this is the array of all cars
-Car **CreateCars(int numroads)
+Car **CreateCars(int numroads, Level l)
 {
     Car **cars = (Car **)malloc(numroads * sizeof(Car *));
     for(int i=0; i<numroads; ++i)
     {
         //int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
-        cars[i] = (Car *)malloc(CARS_PER_LANE * sizeof(Car));
-        for(int j=0; j<CARS_PER_LANE; ++j)
+        cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));
+        for(int j=0; j<l.cars_per_lane; ++j)
         {
-            int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
-            int randomLength = RA(MIN_CAR_LEN, MAX_CAR_LEN);
-            int randomHead = RA(j*MAP_WIDTH/CARS_PER_LANE, (j+1)*MAP_WIDTH/CARS_PER_LANE - randomLength);
-            int randomNotStops = RA(0, CAR_STOPS_PROB)%CAR_STOPS_PROB;
-            int randomNotFriendly = RA(0, CAR_FRIENDLY_PROB)%CAR_FRIENDLY_PROB;
+            int randomSpeed = RA(l.car_min_speed, l.car_max_speed);
+            int randomLength = RA(l.min_car_len, l.max_car_len);
+            int randomHead = RA(j*l.map_width/l.cars_per_lane, (j+1)*l.map_width/l.cars_per_lane - randomLength);
+            int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
+            int randomNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
             cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, !randomNotFriendly, j, 0);
         }
     }
     return cars;
 }
+
+Level CreateLevel(int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
+{
+    Level l;
+    l.min_car_len = min_car_len;
+    l.max_car_len = max_car_len;
+    l.cars_per_lane = cars_per_lane;
+    l.car_min_speed = car_min_speed;
+    l.car_max_speed = car_max_speed;
+    l.car_stops_prob = car_stops_prob;
+    l.car_friendly_prob = car_friendly_prob;
+    l.remove_car_prob = remove_car_prob;
+    l.map_height = map_height;
+    l.map_width = map_width;
+    return l;
+}
+
 
 void PlaceCar(WINDOW *win, Car *car, Player *p)
 {
@@ -373,7 +368,7 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
 }
 
 // car movement
-void MoveCar(WINDOW *win, Player *p, Car *car, Timer t)
+void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
 {
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
@@ -390,8 +385,8 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t)
         }
         else
         {
-            if(RA(0, REMOVE_CAR_PROB) % REMOVE_CAR_PROB == 0 && !car->holdsPlayer)
-                *car = CreateRandomCar(car->lane, car->lastFrameMoved, car->index);
+            if(RA(0, l.remove_car_prob) % l.remove_car_prob == 0 && !car->holdsPlayer)
+                *car = CreateRandomCar(car->lane, car->lastFrameMoved, car->index, l);
             else
                 car->head = -1;
         }
@@ -431,7 +426,7 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 
 
 //car movement
-int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key)
+int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 {
     if(car->isFriendly)
         wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
@@ -452,7 +447,7 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key)
     }
 
     // move the car
-    MoveCar(win, p, car, t);
+    MoveCar(win, p, car, t, l);
     
     // Handle what happens when player wants to attach / is attached
     HandleAttachment(win, car, p, t, key);
@@ -589,11 +584,49 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
         flushinp();         //to 'unclog' the input (so it does not stack up)
         return 1;
     }
+// READING / WRITING TO FILES
+
+void ReadLevelConfig(char *fname, Level *l)
+{
+    FILE *f = fopen(fname, "r");
+    if( f == NULL)
+    {
+        printw("ERROR: config file not found! Check the name of CONFIG_FNAME");
+        endwin();
+        return;
+    }
+        // Read level's attributes
+    int min_car_len;
+    int max_car_len;
+    int cars_per_lane;
+    int car_min_speed;
+    int car_max_speed;
+    int car_stops_prob;
+    int car_friendly_prob;
+    int remove_car_prob;
+    int map_height;
+    int map_width;
+    //skip the first string in a file input, since it's a variable name
+    fscanf(f, "%*s%d", &min_car_len);
+    fscanf(f, "%*s%d", &max_car_len);
+    fscanf(f, "%*s%d", &cars_per_lane);
+    fscanf(f, "%*s%d", &car_min_speed);
+    fscanf(f, "%*s%d", &car_max_speed);
+    fscanf(f, "%*s%d", &car_stops_prob);
+    fscanf(f, "%*s%d", &car_friendly_prob);
+    fscanf(f, "%*s%d", &remove_car_prob);
+    fscanf(f, "%*s%d", &map_height);
+    fscanf(f, "%*s%d", &map_width);
+
+    *l = CreateLevel(min_car_len, max_car_len, cars_per_lane, car_min_speed, car_max_speed, car_stops_prob, car_friendly_prob, remove_car_prob, map_height, map_width);
+
+    fclose(f);
+}
 
 
 // MAIN LOOP
 
-int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads)
+int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l)
 {
     char key;
     do
@@ -606,9 +639,9 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads)
         DisplayTimerInfo(stdscr, &timer, player->yMax, 1);       
         for(int i=0; i<numroads; ++i)
         {
-            for(int j=0; j<CARS_PER_LANE; ++j)
+            for(int j=0; j<l.cars_per_lane; ++j)
             {
-                DisplayCar(win, &cars[i][j], player, timer, key);
+                DisplayCar(win, &cars[i][j], player, timer, key, l);
             }
         }
         // a little brute-force aproach. This line is nescesary because cars used to cover the player symbol
@@ -634,19 +667,15 @@ int main()
     curs_set(0);
     start_color();
     //use_default_colors();
-    
-    // variables
-    int numlevels = 0;   //number of levels
-
-    // load from config file
-    ReadLevelConfig(&numlevels);
-    //printw("number of levels: %d\n", numlevels);
 
     // choosing the level
-    int choice = Choice(numlevels);         // choice -> a variable   Choice -> a function
-    int yMax, xMax;                          // level window dimensions
+    int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
+    Level l;
+    ReadLevelConfig("level0.txt", &l);
 
-    WINDOW *levelwin = StartLevel(choice);
+
+    WINDOW *levelwin = StartLevel(choice, l);
+    int yMax, xMax;                          // level window dimensions
     getmaxyx(levelwin, yMax, xMax);
     nodelay(levelwin, true);
     int numRoads = GenerateRoads(levelwin, 0, yMax, xMax);      //number of road lanes
@@ -656,14 +685,10 @@ int main()
     Timer timer;
     timer = CreateTimer();
 
-    //testing cars
-    // Car car = CreateCar(5, 3, 20, 4, 1, 0, 0);
-    // PlaceCar(levelwin, &car, &player);
-
-    Car **cars = CreateCars(numRoads);
+    Car **cars = CreateCars(numRoads, l);
     for(int i=0; i<numRoads; ++i)
     {
-        for(int j=0; j<CARS_PER_LANE; ++j)
+        for(int j=0; j<l.cars_per_lane; ++j)
         {
             PlaceCar(levelwin, &cars[i][j], &player);
         }
@@ -671,7 +696,7 @@ int main()
     mvprintw(0, 0,"FROG GAME IS WORKING!\nLEVEL %d", choice);
     refresh();
     wrefresh(levelwin);
-    MainLoop(levelwin, &player, timer, cars, numRoads);
+    MainLoop(levelwin, &player, timer, cars, numRoads, l);
     //getch();
     endwin();
     }
