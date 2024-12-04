@@ -19,6 +19,9 @@
 #define Player_SPEED 2
 #define ATTACH_KEY 'c'
 
+#define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
+#define CHANGES_SPEED_PROB 3       // chance that a car can change speed at all
+
 #define PLAYWIN_Y 5
 #define PLAYWIN_X 10
 
@@ -82,6 +85,7 @@ typedef struct{
     int stops;
     int isFriendly;
     int holdsPlayer;
+    int changesSpeed;
     int index;
     int lastFrameMoved;         //frame at which the car has moved for the last time (used for changing car speeds)
 } Car;
@@ -275,7 +279,7 @@ Timer CreateTimer()
     return t;
 }
 
-Car CreateCar(int head, int lane, int length, int speed, int direction, int stops, int isFriendly, int index, int lastFrame)
+Car CreateCar(int head, int lane, int length, int speed, int direction, int stops, int isFriendly, int index, int changesSpeed, int lastFrame)
 {
     Car car;
     car.head = head;
@@ -287,6 +291,7 @@ Car CreateCar(int head, int lane, int length, int speed, int direction, int stop
     car.isFriendly = isFriendly;
     car.index = index;
     car.holdsPlayer = 0;
+    car.changesSpeed = changesSpeed;
     car.lastFrameMoved = lastFrame;
 
     return car;
@@ -298,6 +303,7 @@ Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
     int randomLength = RA(l.min_car_len, l.max_car_len);
     int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
     int randomIsNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
+    int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB)%CHANGES_SPEED_PROB;
     Car car;
     car.head = 0;
     car.lane = lane;
@@ -308,6 +314,7 @@ Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
     car.isFriendly = !randomIsNotFriendly;
     car.index = index;
     car.holdsPlayer = 0;
+    car.changesSpeed = !randomNotChangesSpeed;
     car.lastFrameMoved = lastFrame;
     return car;
 }
@@ -327,7 +334,8 @@ Car **CreateCars(int numroads, Level l)
             int randomHead = RA(j*l.map_width/l.cars_per_lane, (j+1)*l.map_width/l.cars_per_lane - randomLength);
             int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
             int randomNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
-            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, !randomNotFriendly, j, 0);
+            int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB)%CHANGES_SPEED_PROB;
+            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, !randomNotFriendly, j, randomNotChangesSpeed, 0);
         }
     }
     return cars;
@@ -370,6 +378,7 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
 // car movement
 void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
 {
+    //srand(time(NULL));
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
         car->head += car->direction;
@@ -392,6 +401,9 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
         }
         car->lastFrameMoved = t.frame_n;
     }
+    // a small chance of car changing speed during the game
+    if((RA(0, CAR_CHANGE_SPEED_PROB)%CAR_CHANGE_SPEED_PROB == 0) && car->changesSpeed)
+        car->speed = RA(l.car_min_speed, l.car_max_speed);
 }
 
 
@@ -586,9 +598,12 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
     }
 // READING / WRITING TO FILES
 
-void ReadLevelConfig(char *fname, Level *l)
+void ReadLevelConfig(int choice, Level *l)
 {
-    FILE *f = fopen(fname, "r");
+    char level_name[] = "levelX.txt";
+    char level_number = '0'+choice;
+    level_name[5] = level_number;
+    FILE *f = fopen(level_name, "r");
     if( f == NULL)
     {
         printw("ERROR: config file not found! Check the name of CONFIG_FNAME");
@@ -671,7 +686,7 @@ int main()
     // choosing the level
     int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
     Level l;
-    ReadLevelConfig("level0.txt", &l);
+    ReadLevelConfig(choice, &l);
 
 
     WINDOW *levelwin = StartLevel(choice, l);
