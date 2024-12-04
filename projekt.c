@@ -193,7 +193,7 @@ void GameOver(WINDOW *win, Player *p, int border)
             // mvwprintw(win, 4, 0, "*****  *   *   *   *   *****      *****     *     *****   *   *   ");
             mvwprintw(win, 3, 0, "GAME OVER!");
             mvwprintw(win, 10, 0, "Press any key to countinue...                                    ");
-            wrefresh(win);    
+            //wrefresh(win);    
             //usleep(1000*1000*3);
             flushinp();
             getch();
@@ -203,7 +203,7 @@ void GameOver(WINDOW *win, Player *p, int border)
             mvwprintw(win, 3, 0, "                                                                  ");
             // mvwprintw(win, 4, 0, "                                                                  ");
             mvwprintw(win, 10, 0, "                                                                 ");
-            wrefresh(win);
+            //wrefresh(win);
 }
 
 WINDOW *StartLevel(int choice)
@@ -456,7 +456,7 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key)
     HandleAttachment(win, car, p, t, key);
 
 
-    wrefresh(win);
+    //wrefresh(win);
     return 0;
 }
 
@@ -609,9 +609,13 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads)
                 DisplayCar(win, &cars[i][j], player, timer, key);
             }
         }
-        // if(player->isAttached)
-        //     mvwaddch(win, player->yPos, player->xPos, PLAYER_SYMBOL);
-
+        // a little brute-force aproach. This line is nescesary because cars used to cover the player symbol
+        if(player->isAttached)
+            {
+                wattron(win, COLOR_PAIR(ROAD_COL));
+                mvwaddch(win, player->yPos, player->xPos, PLAYER_SYMBOL);
+            }
+        wrefresh(win);
         usleep(1000 * FRAME_TIME);
     }while(key = wgetch(win));
     
