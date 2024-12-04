@@ -40,7 +40,7 @@
 
 // READING / WRITING TO FILES
 
-void readconfig(int *numlevels)
+void ReadLevelConfig(int *numlevels)
 {
     FILE *f = fopen(CONFIG_FNAME, "r");
     if( f == NULL)
@@ -59,6 +59,7 @@ void readconfig(int *numlevels)
     // }
     fclose(f);
 }
+
 
 // GENERATING MAP (key)
 char *GenerateMap(int map_length, int grassprob, int bouncyprob)            // G -> grass
@@ -194,7 +195,7 @@ void GameOver(WINDOW *win, Player *p, int border)
             // mvwprintw(win, 4, 0, "*****  *   *   *   *   *****      *****     *     *****   *   *   ");
             mvwprintw(win, 3, 0, "GAME OVER!");
             mvwprintw(win, 10, 0, "Press any key to countinue...                                    ");
-            //wrefresh(win);    
+            wrefresh(win);    
             //usleep(1000*1000*3);
             flushinp();
             getch();
@@ -204,7 +205,7 @@ void GameOver(WINDOW *win, Player *p, int border)
             mvwprintw(win, 3, 0, "                                                                  ");
             // mvwprintw(win, 4, 0, "                                                                  ");
             mvwprintw(win, 10, 0, "                                                                 ");
-            //wrefresh(win);
+            wrefresh(win);
 }
 
 WINDOW *StartLevel(int choice)
@@ -404,7 +405,7 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 {
             // MAKE IT A FUNCTION
     // attach player to the car i he presses a key and is close
-    if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached)
+    if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached && t.frame_n - p->lastFrameMoved >= Player_SPEED)
     {
         wattron(win, COLOR_PAIR(GRASS_COL));
         mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -561,7 +562,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
                         cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
-                        p->lastFrameMoved = t.frame_n;
+                        p->lastFrameMoved = t.frame_n + 300/FRAME_TIME;
                     }
                     break;
                 default:
@@ -638,7 +639,7 @@ int main()
     int numlevels = 0;   //number of levels
 
     // load from config file
-    readconfig(&numlevels);
+    ReadLevelConfig(&numlevels);
     //printw("number of levels: %d\n", numlevels);
 
     // choosing the level
