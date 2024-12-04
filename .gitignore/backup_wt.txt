@@ -25,8 +25,6 @@
 #define CAR_MIN_SPEED 1
 #define CAR_MAX_SPEED 4
 #define CAR_STOPS_PROB 2
-#define CAR_FRIENDLY_PROB 3
-#define REMOVE_CAR_PROB 3
 
 #define PLAYWIN_Y 5
 #define PLAYWIN_X 10
@@ -115,7 +113,6 @@ typedef struct{
     int direction;
     int stops;
     int isFriendly;
-    int holdsPlayer;
     int index;
     int lastFrameMoved;         //frame at which the car has moved for the last time (used for changing car speeds)
 } Car;
@@ -306,29 +303,8 @@ Car CreateCar(int head, int lane, int length, int speed, int direction, int stop
     car.stops = stops;
     car.isFriendly = isFriendly;
     car.index = index;
-    car.holdsPlayer = 0;
     car.lastFrameMoved = lastFrame;
 
-    return car;
-}
-
-Car CreateRandomCar(int lane, int lastFrame, int index)
-{
-    int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
-    int randomLength = RA(MIN_CAR_LEN, MAX_CAR_LEN);
-    int randomNotStops = RA(0, CAR_STOPS_PROB)%CAR_STOPS_PROB;
-    int randomIsNotFriendly = RA(0, CAR_FRIENDLY_PROB)%CAR_FRIENDLY_PROB;
-    Car car;
-    car.head = 0;
-    car.lane = lane;
-    car.length = randomLength;
-    car.speed = randomSpeed;
-    car.direction = 1;
-    car.stops = !randomNotStops;
-    car.isFriendly = !randomIsNotFriendly;
-    car.index = index;
-    car.holdsPlayer = 0;
-    car.lastFrameMoved = lastFrame;
     return car;
 }
 
@@ -346,8 +322,7 @@ Car **CreateCars(int numroads)
             int randomLength = RA(MIN_CAR_LEN, MAX_CAR_LEN);
             int randomHead = RA(j*MAP_WIDTH/CARS_PER_LANE, (j+1)*MAP_WIDTH/CARS_PER_LANE - randomLength);
             int randomNotStops = RA(0, CAR_STOPS_PROB)%CAR_STOPS_PROB;
-            int randomNotFriendly = RA(0, CAR_FRIENDLY_PROB)%CAR_FRIENDLY_PROB;
-            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, !randomNotFriendly, j, 0);
+            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, 1, j, 0);
         }
     }
     return cars;
@@ -370,13 +345,51 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
     }
 }
 
-// car movement
-void MoveCar(WINDOW *win, Player *p, Car *car, Timer t)
+//car movement
+int MoveCar(WINDOW *win, Car *car, Player *p, Timer t, char key)
 {
+    if(car->isFriendly)
+        wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
+    else
+        wattron(win, COLOR_PAIR(ROAD_COL));
+    // this loop reassures that when one car is surpassing another, there will be no blank space between them on screen
+    for(int i=car->head; i>car->head-car->length+1; --i)
+            if(i >= 0)
+                mvwaddch(win, car->lane, i, '>');
+
+    // some cars stops when frog is close to them
+    if(((mvwinch(win, car->lane+1, car->head+2) & A_CHARTEXT) == PLAYER_SYMBOL) && car->stops && !car->isFriendly)
+    {
+        car->lastFrameMoved = t.frame_n + (1000/FRAME_TIME);
+        car->stops = 0;
+        return 0;
+    }
+
+    // MAKE IT A FUNCTION
+    // attach player to the car i he presses a key and is close
+    if(car->isFriendly && (p->xPos == car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached)
+    {
+        wattron(win, COLOR_PAIR(GRASS_COL));
+        mvwaddch(win, p->yPos, p->xPos, ' ');
+        p->isAttached = 1;
+        p->attachedCarIndex = car->index;
+        p->yPos--;
+        p->lastFrameMoved = t.frame_n +  (1000/FRAME_TIME);
+        wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
+    }
+    // MAKE IT A FUNCTION
+
+        if(p->isAttached)
+        {
+            wattron(win, COLOR_PAIR(ROAD_COL));
+            //mvwaddch(win, p->yPos, p->xPos-1, ' ');
+            mvwaddch(win, p->yPos, p->xPos, PLAYER_SYMBOL);
+        }
+    // move the car
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
         car->head += car->direction;
-        if(((mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT)  != PLAYER_SYMBOL))  // || p->isAttached
+        if(((mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT)  != '@') || p->isAttached)
             mvwaddch(win, car->lane, car->head-car->length, ' ');
         if(car -> head <= p->xMax + car->length)
         {    
@@ -388,73 +401,10 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t)
         }
         else
         {
-            if(RA(0, REMOVE_CAR_PROB) % REMOVE_CAR_PROB == 0 && !car->holdsPlayer)
-                *car = CreateRandomCar(car->lane, car->lastFrameMoved, car->index);
-            else
-                car->head = -1;
+            car->head = -1;
         }
         car->lastFrameMoved = t.frame_n;
     }
-}
-
-
-// function related to moving player while he is attached to the car / while he is being attached
-void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
-{
-            // MAKE IT A FUNCTION
-    // attach player to the car i he presses a key and is close
-    if(car->isFriendly && (p->xPos == car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached)
-    {
-        wattron(win, COLOR_PAIR(GRASS_COL));
-        mvwaddch(win, p->yPos, p->xPos, ' ');
-        p->isAttached = 1;
-        car->holdsPlayer = 1;
-        p -> attachedCarIndex = car->index;
-        p->attachedCarIndex = car->index;
-        p->yPos--;
-        p->lastFrameMoved = t.frame_n +  (1000/FRAME_TIME);
-        wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
-    }
-    // MAKE IT A FUNCTION
-
-    if(p->isAttached && (p->attachedCarIndex == car->index) && (p->yPos == car->lane))
-    {
-        p->xPos = car->head-1;
-        wattron(win, COLOR_PAIR(ROAD_COL));
-        //mvwaddch(win, p->yPos, p->xPos-1, ' ');
-        mvwaddch(win, p->yPos, p->xPos, PLAYER_SYMBOL);
-    }
-}
-
-
-
-//car movement
-int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key)
-{
-    if(car->isFriendly)
-        wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
-    else
-        wattron(win, COLOR_PAIR(ROAD_COL));
-
-    // this loop reassures that when one car is surpassing another, there will be no blank space between them on screen
-    for(int i=car->head; i>car->head-car->length+1; --i)
-        if(i >= 0)
-            mvwaddch(win, car->lane, i, '>');
-
-    // some cars stops when frog is close to them
-    if(((mvwinch(win, car->lane+1, car->head+2) & A_CHARTEXT) == PLAYER_SYMBOL) && car->stops && !car->isFriendly)
-    {
-        car->lastFrameMoved = t.frame_n + (1000/FRAME_TIME);
-        car->stops = 0;
-        return 0;
-    }
-
-    // move the car
-    MoveCar(win, p, car, t);
-    
-    // Handle what happens when player wants to attach / is attached
-    HandleAttachment(win, car, p, t, key);
-
 
     wrefresh(win);
     return 0;
@@ -559,7 +509,6 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
                         // p->yPos--;
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
-                        cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
                         p->lastFrameMoved = t.frame_n;
                     }
                     break;
@@ -580,7 +529,9 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
             GameOver(win, p, 0);
             return 0;
         }
-        if(!p->isAttached)
+        if(p->isAttached)
+            p->xPos = cars[(p->yPos-1)/2][p->attachedCarIndex].head-1;
+        else
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
 
         //RefreshWindow(win, 0, p->yMax, p->xMax);
@@ -606,11 +557,9 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads)
         {
             for(int j=0; j<CARS_PER_LANE; ++j)
             {
-                DisplayCar(win, &cars[i][j], player, timer, key);
+                MoveCar(win, &cars[i][j], player, timer, key);
             }
         }
-        // if(player->isAttached)
-        //     mvwaddch(win, player->yPos, player->xPos, PLAYER_SYMBOL);
 
         usleep(1000 * FRAME_TIME);
     }while(key = wgetch(win));
