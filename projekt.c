@@ -16,10 +16,11 @@
 #define META_COL 3
 #define BLACK_COL 4
 #define FRIENDLY_CAR_COL 5
+#define BUSH_COL 6
 
-#define BUSH_SYMBOL '#'
+#define BUSH_SYMBOL 'O'
 #define PLAYER_SYMBOL '@'
-#define Player_SPEED 2
+#define Player_SPEED 4
 #define ATTACH_KEY 'c'
 
 #define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
@@ -28,7 +29,7 @@
 #define PLAYWIN_Y 5
 #define PLAYWIN_X 10
 
-#define FRAME_TIME 100       //MILISECONDS
+#define FRAME_TIME 50       //MILISECONDS
 
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
 
@@ -104,10 +105,18 @@ int GenerateRoads(WINDOW *win, Level l, int border, int yMax, int xMax)
             }               
         for(j=border; j < xMax-border; ++j)
         {
-            if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && (i>0) && (i<yMax-3))
+            if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && 
+                (i>0) && (i<yMax-3) && (i>1) && (i<xMax))
+            {
+                wattron(win, COLOR_PAIR(BUSH_COL));
                 mvwaddch(win, i, j, BUSH_SYMBOL);
+                wattron(win, COLOR_PAIR(GRASS_COL));
+            }
             else
+            {
+                //wattron(win, COLOR_PAIR(GRASS_COL));
                 mvwaddch(win, i, j, ' ');
+            }
             // mvwaddch(win, i, j, '0'+bush_prob);
         
         }
@@ -227,6 +236,7 @@ WINDOW *StartLevel(int choice, Level l)
     init_pair(META_COL, COLOR_WHITE, COLOR_RED);
     init_pair(BLACK_COL, COLOR_WHITE, COLOR_BLACK);
     init_pair(FRIENDLY_CAR_COL, COLOR_BLUE, COLOR_YELLOW);
+    init_pair(BUSH_COL, COLOR_BLACK, COLOR_GREEN);
 
     return win;
 }
@@ -307,7 +317,8 @@ Timer CreateTimer()
     return t;
 }
 
-Car CreateCar(int head, int lane, int length, int speed, int direction, int stops, int isFriendly, int index, int changesSpeed, int lastFrame)
+Car CreateCar(int head, int lane, int length, int speed, int direction,
+              int stops, int isFriendly, int index, int changesSpeed, int lastFrame)
 {
     Car car;
     car.head = head;
@@ -363,13 +374,15 @@ Car **CreateCars(int numroads, Level l)
             int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
             int randomNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
             int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB)%CHANGES_SPEED_PROB;
-            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops, !randomNotFriendly, j, randomNotChangesSpeed, 0);
+            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops,
+                                   !randomNotFriendly, j, randomNotChangesSpeed, 0);
         }
     }
     return cars;
 }
 
-Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
+Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed,
+                  int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
 {
     Level l;
     l.lev_num = lev_num;
@@ -520,7 +533,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     //PLAYER MOVEMENT FUNCTIONS
     void MvPlayerUp(WINDOW *win, Player *p)
     {
-    if(p->yPos > 0)
+    if((p->yPos > 0) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
         {
             SetGoodColor(win, p);
             mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -529,7 +542,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     }
     void MvPlayerDown(WINDOW *win, Player *p)
     {
-        if(p->yPos < p->yMax-1)
+        if((p->yPos < p->yMax-1) && (mvwinch(win, p->yPos+1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
         {
             SetGoodColor(win, p);
             mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -538,7 +551,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     }
     void MvPlayerRight(WINDOW *win, Player *p)
     {
-        if(p->xPos < p->xMax-1)
+        if((p->xPos < p->xMax-1) && (mvwinch(win, p->yPos, p->xPos + 1) & A_CHARTEXT) != BUSH_SYMBOL)
         {
             SetGoodColor(win, p);
             mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -547,7 +560,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     }
     void MvPlayerLeft(WINDOW *win, Player *p)
     {
-        if(p->xPos > 0)
+        if((p->xPos > 0) && (mvwinch(win, p->yPos, p->xPos - 1) & A_CHARTEXT) != BUSH_SYMBOL)
         {
             SetGoodColor(win, p);
             mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -590,7 +603,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
                     }
                     break;
                 case ATTACH_KEY:
-                    if(p->isAttached)
+                    if((p->isAttached) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
                     {
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
