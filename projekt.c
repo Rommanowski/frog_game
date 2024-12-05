@@ -8,41 +8,41 @@
 
 #define STUDENT_DATA "Jakub Romanowski s203681"
 
-#define NUMLEVELS 4
+#define NUMLEVELS 4         // number of levels
 #define ENTER 10
 
 #define GRASS_COL 1
 #define ROAD_COL 2
 #define META_COL 3
-#define BLACK_COL 4
+#define BLACK_COL 4               // defining colors
 #define FRIENDLY_CAR_COL 5
 #define BUSH_COL 6
 #define STORK_GRASS 7
 #define STORK_ROAD 8
 
 #define BUSH_SYMBOL 'O'
-#define PLAYER_SYMBOL '@'
-#define Player_SPEED 4
-
+#define PLAYER_SYMBOL '@'               // defining symbols
 #define STORK_SYMBOL 'V'
+#define CAR '>'
+
+#define Player_SPEED 4                  // defining speeds
 #define STORK_SPEED 8
 
-#define ATTACH_KEY 'c'
-#define QUITKEY 27      //ESC
+#define ATTACH_KEY 'c'              // defining keys
+#define QUITKEY 27                  // 27 == 'ESC'      
 
 #define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
 #define CHANGES_SPEED_PROB 3       // chance that a car can change speed at all
-#define CAR '>'
 
-#define PLAYWIN_Y 5
+#define PLAYWIN_Y 5             // (0,0) dimensions of the window that displays the game
 #define PLAYWIN_X 10
 
-#define FRAME_TIME 50       //MILISECONDS
+#define FRAME_TIME 50       // MILISECONDS
 
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
 
 
-// OBJECTS OBJECTS OBJECTS
+// -------------OBJECTS OBJECTS OBJECTS-----------------
 typedef struct{
     int xPos;
     int yPos;
@@ -95,32 +95,29 @@ typedef struct{
     int xPos;
     int lastFrameMoved;
     char lastSymbol;
-    //attr_t lastAttr;
 } Stork;
 
-// PROTOTYPES
+// ------------------PROTOTYPES-----------------------
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
 
-// WINDOWS FUNCTIONS
-int GenerateRoads(WINDOW *win, Level l, int border, int yMax, int xMax)
-{
+// -----------------WINDOWS FUNCTIONS-----------------
+int GenerateRoads(WINDOW *win, Level l, int yMax, int xMax)     // this function paints every lane the correct color
+{                                                               // and returns the number of lanes
     int i, j;
     int lanes=0;
     int bush_prob = l.bush_prob;
-    if(border)
-        box(win, 0, 0);
-    for(i=border; i < yMax-border; ++i)
+    for(i=0; i < yMax; ++i)
     {
-        if(i == border)
-            wattron(win, COLOR_PAIR(META_COL));             //top lane is the meta
+        if(i == 0)
+            wattron(win, COLOR_PAIR(META_COL));             // top lane is the meta
         else if(i   %2==0 || i>yMax-3)
-            wattron(win, COLOR_PAIR(GRASS_COL));            //even lanes are grass 
+            wattron(win, COLOR_PAIR(GRASS_COL));            // even lanes are grass 
         else
             {
-                wattron(win, COLOR_PAIR(ROAD_COL));         //uneven lanes are road
+                wattron(win, COLOR_PAIR(ROAD_COL));         // uneven lanes are road
                 lanes++;
             }               
-        for(j=border; j < xMax-border; ++j)
+        for(j=0; j < xMax; ++j)
         {
             if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && 
                 (i>0) && (i<yMax-3) && (i>1) && (i<xMax))
@@ -140,35 +137,31 @@ int GenerateRoads(WINDOW *win, Level l, int border, int yMax, int xMax)
     }
     return lanes;
 }
-void RefreshWindow(WINDOW *win, int border, int yMax, int xMax)
+void RefreshWindow(WINDOW *win, int yMax, int xMax)
 {
     int i, j;
-    if(border)
-        box(win, 0, 0);
-    for(i=border; i < yMax-border; ++i)
+    for(i=0; i < yMax; ++i)
     {
-        if(i == border)
+        if(i == 0)
             wattron(win, COLOR_PAIR(META_COL));             //top lane is the meta
         else if(i%2==0 || i>yMax-3)
             wattron(win, COLOR_PAIR(GRASS_COL));            //even lanes are grass 
         else
             wattron(win, COLOR_PAIR(ROAD_COL));             //uneven lanes are road
-        for(j=border; j < xMax-border; ++j)
+        for(j=0; j < xMax; ++j)
         {
             if(mvwinch(win, i, j) == ' ')
                 mvwaddch(win, i, j, ' ');
         }
     }
 }
-void ClearWindow(WINDOW *win, int border, int yMax, int xMax)
+void ClearWindow(WINDOW *win, int yMax, int xMax)       // function makes the whole window blank
 {
     int i, j;
-    if(border)
-        box(win, 0, 0);
     wattron(win, COLOR_PAIR(BLACK_COL));
-    for(i=border; i < yMax-border; ++i)
+    for(i=0; i < yMax; ++i)
     {
-        for(j=border; j < xMax-border; ++j)
+        for(j=0; j < xMax; ++j)
         {
             mvwaddch(win, i, j, ' ');
         }
@@ -181,35 +174,42 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
     refresh();
     flushinp();
     usleep(1000*1000*1);
-    ClearWindow(win, 0, p->yMax, p->xMax);
+    ClearWindow(win, p->yMax, p->xMax);
 
+    // calculate the score
     int score = t.time * 100;
-    char name[] = "___";
     
-    // remove the "game is woking!" from the top
+    // remove the "game is working!" from the top
     mvprintw(1, 0, "                        ");
     refresh();
 
     // gameResult == 1      ->     game LOST
     // gameResult == 2      ->     game WON
+
+    // if game lost
     if(gameResult == 1)
         mvwprintw(win, 0, 0, "GAME OVER!                              ");
         
+    //if game won
     else if(gameResult == 2)
     {
+        char name[] = "_____";          // initial state of the name that will be inputed into the ranking
+
         mvwprintw(win, 0, 0, "You WON!                                ");
         mvwprintw(win, 1, 0, "SCORE:  %d                         ", score);
         mvwprintw(win, 3, 0, "enter your name...");
         mvwprintw(win, 4, 0, "%s", name);
         wrefresh(win);
-        nodelay(win, false);
+        nodelay(win, false);        
         char key;
         int i=0;
+
+        // inputing the name
         while(1)
         {
             flushinp();
             key = wgetch(win);
-            if((key == 127) && i > 0)
+            if((key == 127) && i > 0)               // if BACKSPACE pressed, remove a character from the name     
             {
                 name[i-1] = '_';
                 i--;
@@ -217,30 +217,26 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
                 wrefresh(win);
                 continue;
             }
-            else if((key >= 'a') && (key <= 'z') && i<3)
+            else if((key >= 'a') && (key <= 'z') && i<5)        // characters must be in the alphabet
             {
-                name[i] = key -'a' + 'A';
+                name[i] = key -'a' + 'A';                       // make the character uppercase
                 mvwprintw(win, 4, 0, "%s", name);
                 wrefresh(win);
                 i++;
             }
-            if(key == 10 && i==3)
+            if(key == 10 && i==5)
                 break;
         }
+        Ranking(win, p, l.lev_num, name, score);            // upload the name and the score to the ranking
     }
+
     mvwprintw(win, 7, 0, "Press any key to countinue... ");
     wrefresh(win);    
     flushinp();
     getch();
     // mvwprintw(win, 3, 0, "                               ");
     // mvwprintw(win, 6, 0, "                               ");
-    if(gameResult == 2)
-    {
-        Ranking(win, p, l.lev_num, name, score);
-        wrefresh(win);
-        getch();
-    }
-    ClearWindow(win, 0, p->yMax, p->xMax);
+    ClearWindow(win, p->yMax, p->xMax);
 }
 
 WINDOW *StartLevel(int choice, Level l)
@@ -443,7 +439,8 @@ Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, 
     return l;
 }
 
-
+// placing the cars at start
+// (otherwise they would be 1 character long at first)
 void PlaceCar(WINDOW *win, Car *car, Player *p)
 {
     wattron(win, COLOR_PAIR(ROAD_COL));
@@ -464,13 +461,13 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
 // car movement
 void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
 {
-    //srand(time(NULL));
+    // move the car only if enough time has passed
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
         car->head += car->direction;
         char ch_rear= (mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT);
         char ch_front= (mvwinch(win, car->lane, car->head) & A_CHARTEXT);
-        if((ch_rear!= PLAYER_SYMBOL) && ch_rear!= STORK_SYMBOL)  // || p->isAttached
+        if((ch_rear!= PLAYER_SYMBOL) && ch_rear!= STORK_SYMBOL)
             mvwaddch(win, car->lane, car->head-car->length, ' ');
         if(car -> head <= p->xMax + car->length)
         {    
@@ -499,28 +496,25 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
 // function related to moving player while he is attached to the car / while he is being attached
 void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 {
-            // MAKE IT A FUNCTION
     // attach player to the car i he presses a key and is close
     if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1)
        && key == ATTACH_KEY && !p->isAttached && t.frame_n - p->lastFrameMoved >= Player_SPEED)
     {
-        wattron(win, COLOR_PAIR(GRASS_COL));
-        mvwaddch(win, p->yPos, p->xPos, ' ');
-        p->isAttached = 1;
-        car->holdsPlayer = 1;
-        p -> attachedCarIndex = car->index;
-        p->attachedCarIndex = car->index;
-        p->yPos--;
-        p->lastFrameMoved = t.frame_n + (Player_SPEED);
+        wattron(win, COLOR_PAIR(GRASS_COL));        // so player does not leave a spot of street's color behind
+        mvwaddch(win, p->yPos, p->xPos, ' ');       // remove player from his previous position
+        p->isAttached = 1;                          // Player is inside a car (so he cannot be hit by a car or captured by the stork)
+        car->holdsPlayer = 1;                       // car is holding the player (the progam needs to know this f.e to not destroy the car)
+        p -> attachedCarIndex = car->index;         // so the program knows which car the player is attached to
+        p->yPos--;                                  // move player up
+        p->lastFrameMoved = t.frame_n + (Player_SPEED);     // add delay to players movement so he cannot jump out instantly
         wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
     }
-    // MAKE IT A FUNCTION
 
+    // if player is attached, move him alongside the car
     if(p->isAttached && (p->attachedCarIndex == car->index) && (p->yPos == car->lane))
     {
         p->xPos = car->head-1;
         wattron(win, COLOR_PAIR(ROAD_COL));
-        //mvwaddch(win, p->yPos, p->xPos-1, ' ');
         mvwaddch(win, p->yPos, p->xPos, PLAYER_SYMBOL);
     }
 }
@@ -564,19 +558,15 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 
 void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
 {
+    // if the timer should not be hidden, display it, otherwise hide it
     if(!hide)
-    {
         mvprintw(yMax+PLAYWIN_Y+2, PLAYWIN_X, "current time:  %.2f   ", t->time);
-        mvprintw(yMax+PLAYWIN_Y+3, PLAYWIN_X, "current frame: %d     ", t->frame_n);
-    }
     else
-    {
         mvprintw(yMax+PLAYWIN_Y+2, PLAYWIN_X, "                      ");
-        mvprintw(yMax+PLAYWIN_Y+3, PLAYWIN_X, "                      ");
-    }
+
     wrefresh(win);
-    t->time += (float)FRAME_TIME/1000;
-    t->frame_n++;
+    t->time += (float)FRAME_TIME/1000;  // update the time
+    t->frame_n++;                       // update the current frame
 }
     
     //PLAYER MOVEMENT FUNCTIONS
@@ -741,16 +731,18 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
 void ReadLevelConfig(int choice, Level *l)
 {
     char level_name[] = "levelX.txt";
-    char level_number = '0'+choice;
+    char level_number = '0'+choice;           // put levels number in place of X
     level_name[5] = level_number;
-    FILE *f = fopen(level_name, "r");
+    FILE *f = fopen(level_name, "r");         // open a file called level[number of level].txt
+
+    // handling errors
     if( f == NULL)
     {
         printw("ERROR: config file not found! Check i a file level%d.txt' exists in the game's folder", choice);
         endwin();
         return;
     }
-        // Read level's attributes
+    // level's attributes
     int bush_prob;
     int min_car_len;
     int max_car_len;
@@ -786,12 +778,14 @@ void ReadLevelConfig(int choice, Level *l)
 
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
 {
-    char fname[12] = "rank_.txt";
+    // similar process as in the function before (ReadLevelConfig)
+    char fname[12] = "rankX.txt";
     fname[4] = levnum + '0';
-    char names[5][4];
-    int scores[5];
-    int score_used = 0;
     FILE *f = fopen(fname, "r");
+
+    char names[5][6];       // matrix storing top 5 players and their names
+    int scores[5];          // array storing top 5 scores
+    int score_used = 0;     // whether or not score has been used already (will be useful when printing the ranking out)
     
     //read ranking from file
     for(int i=0; i<5; ++i)
@@ -816,22 +810,23 @@ void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
     fclose(f);
 
     //print the ranking out
-    ClearWindow(win, 0, p->yMax, p->xMax);
+    ClearWindow(win, p->yMax, p->xMax);
     mvwprintw(win, 0, 0, "Best scores in level %d:", levnum);
     f = fopen(fname, "r");
     for(int i=0; i<5; ++i)
     {
-        char name[4];
+        char name[6];
         int score;
-        fscanf(f, "%s %d", names[i], &scores[i]);
-        mvwprintw(win, i+1, 0, "%d. %s: %d\n", i+1, names[i], scores[i]);
+        fscanf(f, "%s %d", name, &score);
+        mvwprintw(win, i+1, 0, "%d. %s: %d\n", i+1, name, score);
     }
+
     mvwprintw(win, 7, 0, "Press any key to countinue... ");
     fclose(f);
 }
 
 
-// MAIN LOOP
+// ------------------MAIN LOOP---------------------
 
 int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l, Stork *s)
 {
@@ -839,16 +834,19 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
     do
     {
         // function 'DisplayPlayer' returns 0 if game should still be running,
-        // 1 if game is lost, 2 if game is won
+        // 1 if game is lost, 2 if game is won, -1 if player wants to EXIT
         int gameResult = DisplayPlayer(win, player, timer, cars, key);
         if(gameResult == -1)
             return -1;
-        if(gameResult)
+        
+        // if game is won/lost
+        else if(gameResult)
         {
             DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);   
             GameOver(win, player, timer, l, gameResult);
             break;
         }
+        // display current time
         DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);       
         for(int i=0; i<numroads; ++i)
         {
@@ -857,9 +855,12 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
                 DisplayCar(win, &cars[i][j], player, timer, key, l);
             }
         }
+        // move the stork, if it should be present in the game
         if(l.isStork)
             MoveStork(win, s, player, timer);
+
         // a little brute-force aproach. This line is nescesary because cars used to cover the player symbol
+        // when he was attached to a car
         if(player->isAttached)
             {
                 wattron(win, COLOR_PAIR(ROAD_COL));
@@ -880,7 +881,6 @@ int main()
     cbreak();
     curs_set(0);
     start_color();
-    //use_default_colors();
 
     // choosing the level
     int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
@@ -889,23 +889,29 @@ int main()
     Level l;
     ReadLevelConfig(choice, &l);
 
-
+    // making the level window (dimensions taken from the config file)
     WINDOW *levelwin = StartLevel(choice, l);
     int yMax, xMax;                          // level window dimensions
     getmaxyx(levelwin, yMax, xMax);
-    nodelay(levelwin, true);
-    int numRoads = GenerateRoads(levelwin, l, 0, yMax, xMax);      //number of road lanes
+    nodelay(levelwin, true);                 // disable delay for playability
+    int numRoads = GenerateRoads(levelwin, l, yMax, xMax);      //number of road lanes
 
+    // creating player
     Player player;
     player = CreatePlayer(yMax-2, xMax/2, yMax, xMax, PLAYER_SYMBOL);
 
+    // creating timer
     Timer timer;
     timer = CreateTimer();
 
+    // creating stork
     Stork s;
     s = CreateStork(0, 160);
 
+    // creating cars
     Car **cars = CreateCars(numRoads, l);
+
+    // placing cars in their initial position
     for(int i=0; i<numRoads; ++i)
     {
         for(int j=0; j<l.cars_per_lane; ++j)
@@ -913,11 +919,15 @@ int main()
             PlaceCar(levelwin, &cars[i][j], &player);
         }
     }
+    
+    // printing some info on the top of the screen
     mvprintw(0, 0,"LEVEL %d             ", choice);
     mvprintw(1, 0,"FROG GAME IS WORKING!        ");
     mvprintw(PLAYWIN_Y + yMax + 5, PLAYWIN_X, STUDENT_DATA);
     refresh();
     wrefresh(levelwin);
+
+    // check i player wants to leave the game (while playing)
     int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s);
     if(quit == -1)
         break;
