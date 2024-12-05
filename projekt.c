@@ -29,6 +29,7 @@
 
 #define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
 #define CHANGES_SPEED_PROB 3       // chance that a car can change speed at all
+#define CAR '>'
 
 #define PLAYWIN_Y 5
 #define PLAYWIN_X 10
@@ -90,7 +91,8 @@ typedef struct{
     int yPos;
     int xPos;
     int lastFrameMoved;
-    int exitedBush;
+    char lastSymbol;
+    //attr_t lastAttr;
 } Stork;
 
 // PROTOTYPES
@@ -305,6 +307,15 @@ void SetGoodColor(WINDOW *win, Player *p)
     else
         wattron(win, COLOR_PAIR(META_COL));
 }
+void SetGoodColorStork(WINDOW *win, Player *p, Stork *s)
+{
+    if(s->yPos % 2 == 1 && s->yPos <= p->yMax-3)
+        wattron(win, COLOR_PAIR(ROAD_COL));
+    else if(s->yPos >0)
+        wattron(win, COLOR_PAIR(GRASS_COL));
+    else
+        wattron(win, COLOR_PAIR(META_COL));
+}
 
 // OBJECT FUNCTIONS
 Player CreatePlayer(int yPos, int xPos, int yMax, int xMax, char symbol)
@@ -370,6 +381,17 @@ Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
     return car;
 }
 
+Stork CreateStork(int yPos, int xPos)
+{
+    Stork s;
+    s.lastFrameMoved = 0;
+    s.lastSymbol = ' ';
+    s.yPos = yPos;
+    s.xPos = xPos;
+    //s.lastAttr = COLOR_PAIR(GRASS_COL);
+    return s;
+}
+
 //this is the array of all cars
 Car **CreateCars(int numroads, Level l)
 {
@@ -422,7 +444,7 @@ void PlaceCar(WINDOW *win, Car *car, Player *p)
     {
         for(int i=car->head; i>car->head-car->length+1; --i)
             if(i >= 0)
-                mvwaddch(win, car->lane, i, '>');
+                mvwaddch(win, car->lane, i, CAR);
     }
     if(car->direction == -1)
     {
@@ -439,7 +461,9 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
         car->head += car->direction;
-        if(((mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT)  != PLAYER_SYMBOL))  // || p->isAttached
+        char ch_rear= (mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT);
+        char ch_front= (mvwinch(win, car->lane, car->head) & A_CHARTEXT);
+        if((ch_rear!= PLAYER_SYMBOL) && ch_rear!= STORK_SYMBOL)  // || p->isAttached
             mvwaddch(win, car->lane, car->head-car->length, ' ');
         if(car -> head <= p->xMax + car->length)
         {    
@@ -447,7 +471,8 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
                 wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
             else
                 wattron(win, COLOR_PAIR(ROAD_COL));
-            mvwaddch(win, car->lane, car->head, '>');
+            if(ch_front != STORK_SYMBOL)
+                mvwaddch(win, car->lane, car->head, CAR);
         }
         else
         {
@@ -479,7 +504,7 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
         p -> attachedCarIndex = car->index;
         p->attachedCarIndex = car->index;
         p->yPos--;
-        p->lastFrameMoved = t.frame_n +  (1000/FRAME_TIME);
+        p->lastFrameMoved = t.frame_n + (Player_SPEED);
         wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
     }
     // MAKE IT A FUNCTION
@@ -505,11 +530,13 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 
     // this loop reassures that when one car is surpassing another, there will be no blank space between them on screen
     for(int i=car->head; i>car->head-car->length+1; --i)
-        if(i >= 0)
-            mvwaddch(win, car->lane, i, '>');
+        if(i >= 0 && ((mvwinch(win, car->lane, i) & A_CHARTEXT) != STORK_SYMBOL))
+            mvwaddch(win, car->lane, i, CAR);
+ 
 
     // some cars stops when frog is close to them
-    if(((mvwinch(win, car->lane+1, car->head+2) & A_CHARTEXT) == PLAYER_SYMBOL) && car->stops && !car->isFriendly)
+    char ch = (mvwinch(win, car->lane+1, car->head+2) & A_CHARTEXT);
+    if((ch == PLAYER_SYMBOL) && car->stops && !car->isFriendly)
     {
         car->lastFrameMoved = t.frame_n + (1000/FRAME_TIME);
         car->stops = 0;
@@ -623,7 +650,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
                         cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
-                        p->lastFrameMoved = t.frame_n + 300/FRAME_TIME;
+                        p->lastFrameMoved = t.frame_n + Player_SPEED;
                     }
                     break;
                 default:
@@ -636,7 +663,9 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
 
         // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
         // he ran into a car in the previous frame
-        if(((mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT) == '>') && !p->isAttached)
+        char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
+        if(((ch == CAR) || (ch == STORK_SYMBOL))
+             && !p->isAttached)
         {
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
             wrefresh(win);
@@ -656,6 +685,47 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
         flushinp();         //to 'unclog' the input (so it does not stack up)
         return 0;
     }
+
+    // STORK movement
+    void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
+    {
+        if(t.frame_n - s->lastFrameMoved >= STORK_SPEED)
+        {
+        int yMovement, xMovement;
+
+        if(s->yPos > p->yPos)
+            yMovement = -1;
+        else if(s->yPos < p->yPos)
+            yMovement = 1;
+        else
+            yMovement = 0;
+
+        if(s->xPos > p->xPos)
+            xMovement = -1;
+        else if (s->xPos < p->xPos)
+            xMovement = 1;
+        else
+            xMovement = 0;
+
+        SetGoodColorStork(win, p, s);
+        if(s->lastSymbol == BUSH_SYMBOL)
+            wattron(win, COLOR_PAIR(BUSH_COL));
+        if(s->lastSymbol != CAR)
+            mvwaddch(win, s->yPos, s->xPos, s->lastSymbol);
+        else
+            mvwaddch(win, s->yPos, s->xPos, ' ');
+        // if(s->lastFrameMoved == 1)
+        //     mvwaddch(win, s->yPos, s->xPos, ' ');
+        s->yPos += yMovement;
+        s->xPos += xMovement;
+        s->lastSymbol = (mvwinch(win, s->yPos, s->xPos) & A_CHARTEXT);
+        SetGoodColorStork(win, p, s);
+        mvwaddch(win, s->yPos, s->xPos, STORK_SYMBOL);
+        s->lastFrameMoved = t.frame_n;
+        }
+    }
+
+
 // READING / WRITING TO FILES
 
 void ReadLevelConfig(int choice, Level *l)
@@ -753,7 +823,7 @@ void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
 
 // MAIN LOOP
 
-int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l)
+int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l, Stork *s)
 {
     char key;
     do
@@ -775,6 +845,8 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
                 DisplayCar(win, &cars[i][j], player, timer, key, l);
             }
         }
+        if(l.isStork)
+            MoveStork(win, s, player, timer);
         // a little brute-force aproach. This line is nescesary because cars used to cover the player symbol
         if(player->isAttached)
             {
@@ -813,8 +885,12 @@ int main()
 
     Player player;
     player = CreatePlayer(yMax-2, xMax/2, yMax, xMax, PLAYER_SYMBOL);
+
     Timer timer;
     timer = CreateTimer();
+
+    Stork s;
+    s = CreateStork(0, 160);
 
     Car **cars = CreateCars(numRoads, l);
     for(int i=0; i<numRoads; ++i)
@@ -829,7 +905,7 @@ int main()
     mvprintw(PLAYWIN_Y + yMax + 5, PLAYWIN_X, STUDENT_DATA);
     refresh();
     wrefresh(levelwin);
-    MainLoop(levelwin, &player, timer, cars, numRoads, l);
+    MainLoop(levelwin, &player, timer, cars, numRoads, l, &s);
     //getch();
     endwin();
     }
