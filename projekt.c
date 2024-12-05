@@ -9,7 +9,9 @@
 #define STUDENT_DATA "Jakub Romanowski s203681"
 
 #define NUMLEVELS 4         // number of levels
-#define ENTER 10
+
+#define ENTER 10            // non-letter keys in more readable form
+#define BACKSPACE 123
 
 #define GRASS_COL 1
 #define ROAD_COL 2
@@ -37,7 +39,8 @@
 #define PLAYWIN_Y 5             // (0,0) dimensions of the window that displays the game
 #define PLAYWIN_X 10
 
-#define FRAME_TIME 50       // MILISECONDS
+#define FRAME_TIME 50       // each frame lasts this many miliseconds
+#define CAR_STOP_TIME 1500      // car stops for this many miliseconds to let the player pass the street
 
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
 
@@ -65,7 +68,6 @@ typedef struct{
     int lane;
     int length;
     int speed;
-    int direction;
     int stops;
     int isFriendly;
     int holdsPlayer;
@@ -100,12 +102,14 @@ typedef struct{
 // ------------------PROTOTYPES-----------------------
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
 
-// -----------------WINDOWS FUNCTIONS-----------------
+// -----------------WINDOW FUNCTIONS-----------------
 int GenerateRoads(WINDOW *win, Level l, int yMax, int xMax)     // this function paints every lane the correct color
 {                                                               // and returns the number of lanes
     int i, j;
     int lanes=0;
     int bush_prob = l.bush_prob;
+
+    // panting the lanes correct colors
     for(i=0; i < yMax; ++i)
     {
         if(i == 0)
@@ -115,46 +119,26 @@ int GenerateRoads(WINDOW *win, Level l, int yMax, int xMax)     // this function
         else
             {
                 wattron(win, COLOR_PAIR(ROAD_COL));         // uneven lanes are road
-                lanes++;
-            }               
+                lanes++;                                    // if a road is being created, increase the number of roads
+            }  
+                     
         for(j=0; j < xMax; ++j)
         {
-            if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && 
-                (i>0) && (i<yMax-3) && (i>1) && (i<xMax))
+            // generate bushes of grass lanes, but not on the bottom/meta
+            if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && (i>0) && (i<yMax-3) && (i>1) && (i<xMax))
             {
                 wattron(win, COLOR_PAIR(BUSH_COL));
                 mvwaddch(win, i, j, BUSH_SYMBOL);
                 wattron(win, COLOR_PAIR(GRASS_COL));
             }
             else
-            {
-                //wattron(win, COLOR_PAIR(GRASS_COL));
-                mvwaddch(win, i, j, ' ');
-            }
-            // mvwaddch(win, i, j, '0'+bush_prob);
+                mvwaddch(win, i, j, ' ');       // if not a bush, a ' ' is added
         
         }
     }
     return lanes;
 }
-void RefreshWindow(WINDOW *win, int yMax, int xMax)
-{
-    int i, j;
-    for(i=0; i < yMax; ++i)
-    {
-        if(i == 0)
-            wattron(win, COLOR_PAIR(META_COL));             //top lane is the meta
-        else if(i%2==0 || i>yMax-3)
-            wattron(win, COLOR_PAIR(GRASS_COL));            //even lanes are grass 
-        else
-            wattron(win, COLOR_PAIR(ROAD_COL));             //uneven lanes are road
-        for(j=0; j < xMax; ++j)
-        {
-            if(mvwinch(win, i, j) == ' ')
-                mvwaddch(win, i, j, ' ');
-        }
-    }
-}
+
 void ClearWindow(WINDOW *win, int yMax, int xMax)       // function makes the whole window blank
 {
     int i, j;
@@ -169,6 +153,7 @@ void ClearWindow(WINDOW *win, int yMax, int xMax)       // function makes the wh
     wrefresh(win);
 }
 
+// what happens if game is over (either WON or LOST)
 void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
 {
     refresh();
@@ -209,7 +194,7 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
         {
             flushinp();
             key = wgetch(win);
-            if((key == 127) && i > 0)               // if BACKSPACE pressed, remove a character from the name     
+            if((key == BACKSPACE) && i > 0)               // if BACKSPACE pressed, remove a character from the name     
             {
                 name[i-1] = '_';
                 i--;
@@ -256,15 +241,18 @@ WINDOW *StartLevel(int choice, Level l)
     return win;
 }
 
-// MENU FUNCTIONS
+// --------------------MENU FUNCTIONS-----------------------
 int Choice(int numlevels)
 {
     mvprintw(0, 0,"Choose the level:                 ");
     mvprintw(1, 0,"Press ESC to leave the game       ");
     refresh();
+    
+    // create a menu window with a box around it
     WINDOW *menuwin = newwin(numlevels+2, 20, 5, 10);
     box(menuwin, 0, 0);
 
+    // choosing the level
     int highlight =0;
     while(1)
     {
@@ -275,32 +263,32 @@ int Choice(int numlevels)
             mvwprintw(menuwin, 1+i, 2, "level %d", i);
             wattroff(menuwin, A_REVERSE);
         }
-    int key = wgetch(menuwin);
-    switch(key)
-    {
-        case 'w':
-            if(highlight > 0)
-                highlight--;
-            break;
-        case 's':
-            if(highlight < numlevels-1)
-                highlight++;
-            break;
-        case ENTER:                // if ENTER pressed
-            delwin(menuwin);
-            return highlight;
-        case QUITKEY:
-            return -1;
-        default:
-            break;
-    }
+        int key = wgetch(menuwin);
+        switch(key)
+        {
+            case 'w':
+                if(highlight > 0)
+                    highlight--;
+                break;
+            case 's':
+                if(highlight < numlevels-1)
+                    highlight++;
+                break;
+            case ENTER:                // if ENTER pressed
+                delwin(menuwin);
+                return highlight;
+            case QUITKEY:
+                return -1;
+            default:
+                break;
+        }
     }
     return 0;
 }
 
-// LEVELS FUNCTIONS
-
-// COLOR FUNCTIONS
+// -------------------COLOR FUNCTIONS--------------------------
+// Two similar functions. They set the right color, useful when chaning position of player/stork
+// For better understanding, check GenerateRoads function
 void SetGoodColor(WINDOW *win, Player *p)
 {
     if(p->yPos % 2 == 1 && p->yPos <= p->yMax-3)
@@ -320,9 +308,10 @@ void SetGoodColorStork(WINDOW *win, Player *p, Stork *s)
         wattron(win, COLOR_PAIR(META_COL));
 }
 
-// OBJECT FUNCTIONS
+// -----------------OBJECT FUNCTIONS------------------------
 Player CreatePlayer(int yPos, int xPos, int yMax, int xMax, char symbol)
 {
+    // create player
     Player p;
     p.yPos = yPos;
     p.xPos = xPos;
@@ -337,21 +326,21 @@ Player CreatePlayer(int yPos, int xPos, int yMax, int xMax, char symbol)
 
 Timer CreateTimer()
 {
+    // create timer
     Timer t;
     t.time = 0;
     t.frame_n = 0;
     return t;
 }
 
-Car CreateCar(int head, int lane, int length, int speed, int direction,
-              int stops, int isFriendly, int index, int changesSpeed, int lastFrame)
+Car CreateCar(int head, int lane, int length, int speed, int stops, int isFriendly, int index, int changesSpeed, int lastFrame)
 {
+    // create a car with given parameters
     Car car;
     car.head = head;
     car.lane = lane;
     car.length = length;
     car.speed = speed;
-    car.direction = direction;
     car.stops = stops;
     car.isFriendly = isFriendly;
     car.index = index;
@@ -364,6 +353,7 @@ Car CreateCar(int head, int lane, int length, int speed, int direction,
 
 Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
 {
+    // create random parameters, return a car with those parameters
     int randomSpeed = RA(l.car_min_speed, l.car_max_speed);
     int randomLength = RA(l.min_car_len, l.max_car_len);
     int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
@@ -374,7 +364,6 @@ Car CreateRandomCar(int lane, int lastFrame, int index, Level l)
     car.lane = lane;
     car.length = randomLength;
     car.speed = randomSpeed;
-    car.direction = 1;
     car.stops = !randomNotStops;
     car.isFriendly = !randomIsNotFriendly;
     car.index = index;
@@ -395,29 +384,31 @@ Stork CreateStork(int yPos, int xPos)
     return s;
 }
 
-//this is the array of all cars
+// this is the array of all cars
 Car **CreateCars(int numroads, Level l)
 {
-    Car **cars = (Car **)malloc(numroads * sizeof(Car *));
+    Car **cars = (Car **)malloc(numroads * sizeof(Car *));  // allocate memory for rows of cars' matrix (one row for every road lane)
     for(int i=0; i<numroads; ++i)
     {
-        //int randomSpeed = RA(CAR_MIN_SPEED, CAR_MAX_SPEED);
-        cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));
+        cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));     // numbers of cars in a row should equal car_per_lane (number from config file)
+
+        // creating a random car
         for(int j=0; j<l.cars_per_lane; ++j)
         {
             int randomSpeed = RA(l.car_min_speed, l.car_max_speed);
             int randomLength = RA(l.min_car_len, l.max_car_len);
-            int randomHead = RA(j*l.map_width/l.cars_per_lane, (j+1)*l.map_width/l.cars_per_lane - randomLength);
+            int randomHead = RA(j*l.map_width/l.cars_per_lane, (j+1)*l.map_width/l.cars_per_lane - randomLength);   // cars are placed randomly, but this weird equation makes the layou more even
             int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
             int randomNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
             int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB)%CHANGES_SPEED_PROB;
-            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, 1, !randomNotStops,
+            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, !randomNotStops,
                                    !randomNotFriendly, j, randomNotChangesSpeed, 0);
         }
     }
     return cars;
 }
 
+// this function creates a level with all the parameters from the inpu
 Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed,
                   int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height,
                   int map_width, int isStork)
@@ -444,18 +435,9 @@ Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, 
 void PlaceCar(WINDOW *win, Car *car, Player *p)
 {
     wattron(win, COLOR_PAIR(ROAD_COL));
-    if(car->direction == 1)
-    {
-        for(int i=car->head; i>car->head-car->length+1; --i)
-            if(i >= 0)
-                mvwaddch(win, car->lane, i, CAR);
-    }
-    if(car->direction == -1)
-    {
-        for(int i=car->head; i<car->head + car->length; ++i)
-            if(i+car->length <= p->xMax)
-                mvwaddch(win, car->lane, i, '<');
-    }
+    for(int i=car->head; i>car->head-car->length+1; --i)
+        if(i >= 0)
+            mvwaddch(win, car->lane, i, CAR);
 }
 
 // car movement
@@ -464,7 +446,7 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
     // move the car only if enough time has passed
     if(t.frame_n - car->lastFrameMoved>= car->speed)
     {
-        car->head += car->direction;
+        car->head++;
         char ch_rear= (mvwinch(win, car->lane, car->head - car->length) & A_CHARTEXT);
         char ch_front= (mvwinch(win, car->lane, car->head) & A_CHARTEXT);
         if((ch_rear!= PLAYER_SYMBOL) && ch_rear!= STORK_SYMBOL)
@@ -524,6 +506,7 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 //car movement
 int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 {
+    // chosing the right color
     if(car->isFriendly)
         wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
     else
@@ -531,16 +514,16 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 
     // this loop reassures that when one car is surpassing another, there will be no blank space between them on screen
     for(int i=car->head; i>car->head-car->length+1; --i)
-        if(i >= 0 && ((mvwinch(win, car->lane, i) & A_CHARTEXT) != STORK_SYMBOL))
+        if(i >= 0 && ((mvwinch(win, car->lane, i) & A_CHARTEXT) != STORK_SYMBOL))       // don't cover the stork - it should be visible all the time
             mvwaddch(win, car->lane, i, CAR);
  
-
-    // some cars stops when frog is close to them
+    // some cars stop when the frog is trying to get across the street
+    // Checking if player is next to the car, below it
     char ch = (mvwinch(win, car->lane+1, car->head+2) & A_CHARTEXT);
-    if((ch == PLAYER_SYMBOL) && car->stops && !car->isFriendly)
+    if((ch == PLAYER_SYMBOL) && car->stops && !car->isFriendly)         // friendly cars don't stop (ironically), so the player can jump inside them easily
     {
-        car->lastFrameMoved = t.frame_n + (1000/FRAME_TIME);
-        car->stops = 0;
+        car->lastFrameMoved = t.frame_n + (CAR_STOP_TIME/FRAME_TIME);   // delay cars movement
+        car->stops = 0;                                                 // car stops only once for the player (then it gets annoyed) 
         return 0;
     }
 
@@ -569,7 +552,8 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     t->frame_n++;                       // update the current frame
 }
     
-    //PLAYER MOVEMENT FUNCTIONS
+    //------------------PLAYER MOVEMENT FUNCTIONS---------------------
+    // the if statements prevent running outside the map or into a bush
     void MvPlayerUp(WINDOW *win, Player *p)
     {
     if((p->yPos > 0) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
@@ -609,7 +593,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
 
     int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
     {
-        if(t.frame_n - p->lastFrameMoved >= Player_SPEED)
+        if(t.frame_n - p->lastFrameMoved >= Player_SPEED)       // move only when enough time has passed since the last movement
         {
             switch(key)
             {
@@ -642,7 +626,8 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
                     }
                     break;
                 case ATTACH_KEY:
-                    if((p->isAttached) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
+                    // this long if statement check if player is attached (only then he can jump out), would not jump into a bush and if he is inside the map's bonds
+                    if((p->isAttached) && ((mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL) && (p->xPos >=0) && (p->xPos < p->xMax))
                     {
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
@@ -650,24 +635,23 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
                         p->lastFrameMoved = t.frame_n + Player_SPEED;
                     }
                     break;
-                case QUITKEY:
+                case QUITKEY:       // return -1 (signal to quit the game) if QUITKEY pressed
                     return -1;
                     break;
                 default:
                     break;
             }
         }
-
-        // these lines make colors of the map stay as they should be
         SetGoodColor(win, p);
 
         // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
         // he ran into a car in the previous frame
         char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
-        if(((ch == CAR) || (ch == STORK_SYMBOL))
-             && !p->isAttached)
+
+        // if there is a car or stork in players position before he is placed, it means the the game has been lost
+        if(((ch == CAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
         {
-            mvwaddch(win, p->yPos, p->xPos, p->symbol);
+            mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
             wrefresh(win);
             return 1;
         }
@@ -678,11 +662,12 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
             wrefresh(win);
             return 2; 
         }
+        // display player if he is not attached
+        // otherwise, he will be displayed by a function that moves a car he is attached to
         if(!p->isAttached)
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
 
-        //RefreshWindow(win, 0, p->yMax, p->xMax);
-        flushinp();         //to 'unclog' the input (so it does not stack up)
+        flushinp();         //to 'unclog' the input
         return 0;
     }
 
@@ -707,6 +692,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
         else
             xMovement = 0;
 
+        // remove stork's trace before moving it
         SetGoodColorStork(win, p, s);
         if(s->lastSymbol == BUSH_SYMBOL)
             wattron(win, COLOR_PAIR(BUSH_COL));
@@ -714,14 +700,14 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
             mvwaddch(win, s->yPos, s->xPos, s->lastSymbol);
         else
             mvwaddch(win, s->yPos, s->xPos, ' ');
-        // if(s->lastFrameMoved == 1)
-        //     mvwaddch(win, s->yPos, s->xPos, ' ');
+
+        // update stork's position, display it
         s->yPos += yMovement;
         s->xPos += xMovement;
         s->lastSymbol = (mvwinch(win, s->yPos, s->xPos) & A_CHARTEXT);
         SetGoodColorStork(win, p, s);
         mvwaddch(win, s->yPos, s->xPos, STORK_SYMBOL);
-        s->lastFrameMoved = t.frame_n;
+        s->lastFrameMoved = t.frame_n;      // update storks timer
         }
     }
 
