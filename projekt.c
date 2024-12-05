@@ -17,6 +17,7 @@
 #define BLACK_COL 4
 #define FRIENDLY_CAR_COL 5
 
+#define BUSH_SYMBOL '#'
 #define PLAYER_SYMBOL '@'
 #define Player_SPEED 2
 #define ATTACH_KEY 'c'
@@ -66,6 +67,7 @@ typedef struct{
 
 typedef struct{
     int lev_num;
+    int bush_prob;
     int min_car_len;
     int max_car_len;
     int cars_per_lane;
@@ -82,10 +84,11 @@ typedef struct{
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
 
 // WINDOWS FUNCTIONS
-int GenerateRoads(WINDOW *win, int border, int yMax, int xMax)
+int GenerateRoads(WINDOW *win, Level l, int border, int yMax, int xMax)
 {
     int i, j;
     int lanes=0;
+    int bush_prob = l.bush_prob;
     if(border)
         box(win, 0, 0);
     for(i=border; i < yMax-border; ++i)
@@ -101,7 +104,12 @@ int GenerateRoads(WINDOW *win, int border, int yMax, int xMax)
             }               
         for(j=border; j < xMax-border; ++j)
         {
-            mvwaddch(win, i, j, ' ');
+            if((RA(0, bush_prob) % bush_prob == 0) && (i%2 == 0) && (i>0) && (i<yMax-3))
+                mvwaddch(win, i, j, BUSH_SYMBOL);
+            else
+                mvwaddch(win, i, j, ' ');
+            // mvwaddch(win, i, j, '0'+bush_prob);
+        
         }
     }
     return lanes;
@@ -361,10 +369,11 @@ Car **CreateCars(int numroads, Level l)
     return cars;
 }
 
-Level CreateLevel(int lev_num, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
+Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
 {
     Level l;
     l.lev_num = lev_num;
+    l.bush_prob = bush_prob;
     l.min_car_len = min_car_len;
     l.max_car_len = max_car_len;
     l.cars_per_lane = cars_per_lane;
@@ -634,6 +643,7 @@ void ReadLevelConfig(int choice, Level *l)
         return;
     }
         // Read level's attributes
+    int bush_prob;
     int min_car_len;
     int max_car_len;
     int cars_per_lane;
@@ -645,6 +655,7 @@ void ReadLevelConfig(int choice, Level *l)
     int map_height;
     int map_width;
     //skip the first string in a file input, since it's a variable name
+    fscanf(f, "%*s%d", &bush_prob);
     fscanf(f, "%*s%d", &min_car_len);
     fscanf(f, "%*s%d", &max_car_len);
     fscanf(f, "%*s%d", &cars_per_lane);
@@ -656,9 +667,9 @@ void ReadLevelConfig(int choice, Level *l)
     fscanf(f, "%*s%d", &map_height);
     fscanf(f, "%*s%d", &map_width);
 
-    *l = CreateLevel(choice, min_car_len, max_car_len, cars_per_lane, car_min_speed,
-                    car_max_speed, car_stops_prob, car_friendly_prob, remove_car_prob,
-                    map_height, map_width);
+    *l = CreateLevel(choice, bush_prob, min_car_len, max_car_len, cars_per_lane,
+                    car_min_speed, car_max_speed, car_stops_prob, car_friendly_prob,
+                    remove_car_prob, map_height, map_width);
 
     fclose(f);
 }
@@ -768,7 +779,7 @@ int main()
     int yMax, xMax;                          // level window dimensions
     getmaxyx(levelwin, yMax, xMax);
     nodelay(levelwin, true);
-    int numRoads = GenerateRoads(levelwin, 0, yMax, xMax);      //number of road lanes
+    int numRoads = GenerateRoads(levelwin, l, 0, yMax, xMax);      //number of road lanes
 
     Player player;
     player = CreatePlayer(yMax-2, xMax/2, yMax, xMax, PLAYER_SYMBOL);

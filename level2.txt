@@ -1,5 +1,5 @@
-
-min_car_len 4  
+bush_prob 2
+min_car_len 4
 max_car_len 6  
 cars_per_lane 6  
 car_min_speed 1  

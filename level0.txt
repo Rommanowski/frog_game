@@ -1,11 +1,11 @@
-
+bush_prob 3
 min_car_len 4  
 max_car_len 6  
-cars_per_lane 0
-car_min_speed 2 
-car_max_speed 6 
-car_stops_prob 1
+cars_per_lane 6  
+car_min_speed 1  
+car_max_speed 2  
+car_stops_prob 2  
 car_friendly_prob 2
-remove_car_prob 3  
-map_height 8
-map_width 70
+remove_car_prob 1  
+map_height 25  
+map_width 175  
