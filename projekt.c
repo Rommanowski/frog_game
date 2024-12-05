@@ -17,6 +17,8 @@
 #define BLACK_COL 4
 #define FRIENDLY_CAR_COL 5
 #define BUSH_COL 6
+#define STORK_GRASS 7
+#define STORK_ROAD 8
 
 #define BUSH_SYMBOL 'O'
 #define PLAYER_SYMBOL '@'
@@ -251,6 +253,8 @@ WINDOW *StartLevel(int choice, Level l)
     init_pair(BLACK_COL, COLOR_WHITE, COLOR_BLACK);
     init_pair(FRIENDLY_CAR_COL, COLOR_BLUE, COLOR_YELLOW);
     init_pair(BUSH_COL, COLOR_BLACK, COLOR_GREEN);
+    init_pair(STORK_GRASS, COLOR_RED, COLOR_GREEN);
+    init_pair(STORK_ROAD, COLOR_RED, COLOR_YELLOW);
 
     return win;
 }
@@ -310,9 +314,9 @@ void SetGoodColor(WINDOW *win, Player *p)
 void SetGoodColorStork(WINDOW *win, Player *p, Stork *s)
 {
     if(s->yPos % 2 == 1 && s->yPos <= p->yMax-3)
-        wattron(win, COLOR_PAIR(ROAD_COL));
+        wattron(win, COLOR_PAIR(STORK_ROAD));
     else if(s->yPos >0)
-        wattron(win, COLOR_PAIR(GRASS_COL));
+        wattron(win, COLOR_PAIR(STORK_GRASS));
     else
         wattron(win, COLOR_PAIR(META_COL));
 }
