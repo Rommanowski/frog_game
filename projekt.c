@@ -28,6 +28,7 @@
 #define STORK_SPEED 8
 
 #define ATTACH_KEY 'c'
+#define QUITKEY 27      //ESC
 
 #define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
 #define CHANGES_SPEED_PROB 3       // chance that a car can change speed at all
@@ -263,7 +264,7 @@ WINDOW *StartLevel(int choice, Level l)
 int Choice(int numlevels)
 {
     mvprintw(0, 0,"Choose the level:                 ");
-    mvprintw(1, 0,"                                  ");
+    mvprintw(1, 0,"Press ESC to leave the game       ");
     refresh();
     WINDOW *menuwin = newwin(numlevels+2, 20, 5, 10);
     box(menuwin, 0, 0);
@@ -292,6 +293,8 @@ int Choice(int numlevels)
         case ENTER:                // if ENTER pressed
             delwin(menuwin);
             return highlight;
+        case QUITKEY:
+            return -1;
         default:
             break;
     }
@@ -657,6 +660,9 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
                         p->lastFrameMoved = t.frame_n + Player_SPEED;
                     }
                     break;
+                case QUITKEY:
+                    return -1;
+                    break;
                 default:
                     break;
             }
@@ -835,6 +841,8 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         // function 'DisplayPlayer' returns 0 if game should still be running,
         // 1 if game is lost, 2 if game is won
         int gameResult = DisplayPlayer(win, player, timer, cars, key);
+        if(gameResult == -1)
+            return -1;
         if(gameResult)
         {
             DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);   
@@ -860,7 +868,6 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         wrefresh(win);
         usleep(1000 * FRAME_TIME);
     }while(key = wgetch(win));
-    
 }
 
 int main()
@@ -877,6 +884,8 @@ int main()
 
     // choosing the level
     int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
+    if(choice == -1)                        //choice returns -1 if QUITKEY pressed
+        break;
     Level l;
     ReadLevelConfig(choice, &l);
 
@@ -905,13 +914,17 @@ int main()
         }
     }
     mvprintw(0, 0,"LEVEL %d             ", choice);
-    mvprintw(1, 0,"FROG GAME IS WORKING!");
+    mvprintw(1, 0,"FROG GAME IS WORKING!        ");
     mvprintw(PLAYWIN_Y + yMax + 5, PLAYWIN_X, STUDENT_DATA);
     refresh();
     wrefresh(levelwin);
-    MainLoop(levelwin, &player, timer, cars, numRoads, l, &s);
+    int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s);
+    if(quit == -1)
+        break;
     //getch();
     endwin();
     }
+
+    endwin();
     return 0;
 }
