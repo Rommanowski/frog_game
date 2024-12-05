@@ -9,3 +9,4 @@ car_friendly_prob 3
 remove_car_prob 4  
 map_height 25  
 map_width 175  
+isStork 0

@@ -21,6 +21,10 @@
 #define BUSH_SYMBOL 'O'
 #define PLAYER_SYMBOL '@'
 #define Player_SPEED 4
+
+#define STORK_SYMBOL 'V'
+#define STORK_SPEED 8
+
 #define ATTACH_KEY 'c'
 
 #define CAR_CHANGE_SPEED_PROB 100 // chance of car changing speed in a tick
@@ -79,7 +83,15 @@ typedef struct{
     int remove_car_prob;
     int map_height;
     int map_width;
+    int isStork;
 } Level;
+
+typedef struct{
+    int yPos;
+    int xPos;
+    int lastFrameMoved;
+    int exitedBush;
+} Stork;
 
 // PROTOTYPES
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
@@ -382,7 +394,8 @@ Car **CreateCars(int numroads, Level l)
 }
 
 Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed,
-                  int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
+                  int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height,
+                  int map_width, int isStork)
 {
     Level l;
     l.lev_num = lev_num;
@@ -397,6 +410,7 @@ Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, 
     l.remove_car_prob = remove_car_prob;
     l.map_height = map_height;
     l.map_width = map_width;
+    l.isStork = isStork;
     return l;
 }
 
@@ -455,7 +469,8 @@ void HandleAttachment(WINDOW *win,Car *car, Player *p, Timer t, char key)
 {
             // MAKE IT A FUNCTION
     // attach player to the car i he presses a key and is close
-    if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1) && key == ATTACH_KEY && !p->isAttached && t.frame_n - p->lastFrameMoved >= Player_SPEED)
+    if(car->isFriendly && (p->xPos > car->head-car->length && p->xPos <= car->head) && (p->yPos == car->lane+1)
+       && key == ATTACH_KEY && !p->isAttached && t.frame_n - p->lastFrameMoved >= Player_SPEED)
     {
         wattron(win, COLOR_PAIR(GRASS_COL));
         mvwaddch(win, p->yPos, p->xPos, ' ');
@@ -667,6 +682,7 @@ void ReadLevelConfig(int choice, Level *l)
     int remove_car_prob;
     int map_height;
     int map_width;
+    int isStork;
     //skip the first string in a file input, since it's a variable name
     fscanf(f, "%*s%d", &bush_prob);
     fscanf(f, "%*s%d", &min_car_len);
@@ -679,10 +695,11 @@ void ReadLevelConfig(int choice, Level *l)
     fscanf(f, "%*s%d", &remove_car_prob);
     fscanf(f, "%*s%d", &map_height);
     fscanf(f, "%*s%d", &map_width);
+    fscanf(f, "%*s%d", &isStork);
 
     *l = CreateLevel(choice, bush_prob, min_car_len, max_car_len, cars_per_lane,
                     car_min_speed, car_max_speed, car_stops_prob, car_friendly_prob,
-                    remove_car_prob, map_height, map_width);
+                    remove_car_prob, map_height, map_width, isStork);
 
     fclose(f);
 }
