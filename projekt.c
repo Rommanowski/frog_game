@@ -164,30 +164,33 @@ void ClearWindow(WINDOW *win, int border, int yMax, int xMax)
     wrefresh(win);
 }
 
-void GameOver(WINDOW *win, Player *p, int border)
+void GameOver(WINDOW *win, Player *p, Timer t, int gameResult)
 {
-            mvprintw(0, 0, "Frog died!                              ");
-            refresh();
-            usleep(1000*1000*3);
-            ClearWindow(win, 0, p->yMax, p->xMax);
-            // mvwprintw(win, 0, 0, "*****  *****   *   *   *****      *****   *   *   *****   *****   ");
-            // mvwprintw(win, 1, 0, "*      *   *   ** **   *          *   *   *   *   *       *   *   ");
-            // mvwprintw(win, 2, 0, "*  **  *****   * * *   *****      *   *    * *    *****   *****   ");
-            // mvwprintw(win, 3, 0, "*   *  *   *   *   *   *          *   *    * *    *       *  *    ");
-            // mvwprintw(win, 4, 0, "*****  *   *   *   *   *****      *****     *     *****   *   *   ");
-            mvwprintw(win, 3, 0, "GAME OVER!");
-            mvwprintw(win, 10, 0, "Press any key to countinue...                                    ");
-            wrefresh(win);    
-            //usleep(1000*1000*3);
-            flushinp();
-            getch();
-            // mvwprintw(win, 0, 0, "                                                                  ");
-            // mvwprintw(win, 1, 0, "                                                                  ");
-            // mvwprintw(win, 2, 0, "                                                                  ");
-            mvwprintw(win, 3, 0, "                                                                  ");
-            // mvwprintw(win, 4, 0, "                                                                  ");
-            mvwprintw(win, 10, 0, "                                                                 ");
-            wrefresh(win);
+    refresh();
+    usleep(1000*1000*3);
+    ClearWindow(win, 0, p->yMax, p->xMax);
+    
+    // remove the "game is woking!" from the top
+    mvprintw(1, 0, "                        ");
+
+    mvwprintw(win, 10, 0, "Press any key to countinue... ");
+
+    // gameResult == 1      ->     game LOST
+    // gameResult == 2      ->     game WON
+    if(gameResult ==    1)
+        mvwprintw(win, 0, 0, "GAME OVER!                              ");
+    else
+    {
+        mvwprintw(win, 0, 0, "You WON!                                ");
+        mvwprintw(win, 1, 0, "SCORE:  %.f                         ", t.time*100);
+    }
+      
+    wrefresh(win);    
+    flushinp();
+    getch();
+    mvwprintw(win, 3, 0, "                                                                  ");
+    mvwprintw(win, 10, 0, "                                                                 ");
+    wrefresh(win);
 }
 
 WINDOW *StartLevel(int choice, Level l)
@@ -250,10 +253,12 @@ int Choice(int numlevels)
 // COLOR FUNCTIONS
 void SetGoodColor(WINDOW *win, Player *p)
 {
-    if(p->yPos % 2 == 1 && p->yPos < p->yMax-3)
+    if(p->yPos % 2 == 1 && p->yPos <= p->yMax-3)
         wattron(win, COLOR_PAIR(ROAD_COL));
-    else
+    else if(p->yPos >0)
         wattron(win, COLOR_PAIR(GRASS_COL));
+    else
+        wattron(win, COLOR_PAIR(META_COL));
 }
 
 // OBJECT FUNCTIONS
@@ -470,9 +475,9 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
 }
 
 
-void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
+void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
 {
-    if(display)
+    if(!hide)
     {
         mvprintw(yMax+PLAYWIN_Y+2, PLAYWIN_X, "current time:  %.2f   ", t->time);
         mvprintw(yMax+PLAYWIN_Y+3, PLAYWIN_X, "current frame: %d     ", t->frame_n);
@@ -524,6 +529,7 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
             p->xPos--;
         }
     }
+
     int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
     {
         if(t.frame_n - p->lastFrameMoved >= Player_SPEED)
@@ -561,11 +567,6 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
                 case ATTACH_KEY:
                     if(p->isAttached)
                     {
-                        //flushinp();
-                        // mvwaddch(win, p->yPos, p->xPos, ' ');
-                        // p->isAttached=0;
-                        // p->lastFrameMoved = t.frame_n;
-                        // p->yPos--;
                         MvPlayerUp(win, p);
                         p->isAttached = 0;
                         cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
@@ -586,15 +587,20 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int display)
         {
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
             wrefresh(win);
-            GameOver(win, p, 0);
-            return 0;
+            return 1;
         }
+        if(p->yPos == 0)
+            {
+            mvwaddch(win, p->yPos, p->xPos, p->symbol);
+            wrefresh(win);
+            return 2; 
+            }
         if(!p->isAttached)
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
 
         //RefreshWindow(win, 0, p->yMax, p->xMax);
         flushinp();         //to 'unclog' the input (so it does not stack up)
-        return 1;
+        return 0;
     }
 // READING / WRITING TO FILES
 
@@ -606,7 +612,7 @@ void ReadLevelConfig(int choice, Level *l)
     FILE *f = fopen(level_name, "r");
     if( f == NULL)
     {
-        printw("ERROR: config file not found! Check the name of CONFIG_FNAME");
+        printw("ERROR: config file not found! Check i a file level%d.txt' exists in the game's folder", choice);
         endwin();
         return;
     }
@@ -646,12 +652,16 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
     char key;
     do
     {
-        if (!DisplayPlayer(win, player, timer, cars, key))
+        // function 'DisplayPlayer' returns 0 if game should still be running,
+        // 1 if game is lost, 2 if game is won
+        int gameResult = DisplayPlayer(win, player, timer, cars, key);
+        if(gameResult)
         {
-            DisplayTimerInfo(stdscr, &timer, player->yMax, 0);   
+            DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);   
+            GameOver(win, player, timer, gameResult);
             break;
         }
-        DisplayTimerInfo(stdscr, &timer, player->yMax, 1);       
+        DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);       
         for(int i=0; i<numroads; ++i)
         {
             for(int j=0; j<l.cars_per_lane; ++j)
@@ -708,7 +718,8 @@ int main()
             PlaceCar(levelwin, &cars[i][j], &player);
         }
     }
-    mvprintw(0, 0,"FROG GAME IS WORKING!\nLEVEL %d", choice);
+    mvprintw(0, 0,"LEVEL %d             ", choice);
+    mvprintw(1, 0,"FROG GAME IS WORKING!");
     refresh();
     wrefresh(levelwin);
     MainLoop(levelwin, &player, timer, cars, numRoads, l);
