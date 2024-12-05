@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define STUDENT_DATA "Jakub Romanowski s203681"
+
 #define NUMLEVELS 4
 #define ENTER 10
 
@@ -29,34 +31,6 @@
 
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
 
-// GENERATING MAP (key)
-char *GenerateMap(int map_length, int grassprob, int bouncyprob)            // G -> grass
-{                                                                           // H -> road(cars dissappear)
-    srand(time(NULL));                                                      // B -> cars are bouncy
-    char *map = (char *)malloc((map_length+1) * sizeof(char));
-    for(int i=0; i<5; ++i)
-    {
-        map[i] = 'G';
-    }
-    for(int i=5; i<map_length; ++i)
-    {
-        int a=rand();
-        int b=rand();
-        if(a%grassprob == 0)
-            map[i]='G';
-        else
-        {
-            if(b%bouncyprob == 0)
-            {
-                map[i] = 'B';
-            }
-            else
-                map[i] = 'H';
-        }
-    }
-    map[map_length] = '\0';
-    return map;
-}
 
 // OBJECTS OBJECTS OBJECTS
 typedef struct{
@@ -91,6 +65,7 @@ typedef struct{
 } Car;
 
 typedef struct{
+    int lev_num;
     int min_car_len;
     int max_car_len;
     int cars_per_lane;
@@ -102,6 +77,9 @@ typedef struct{
     int map_height;
     int map_width;
 } Level;
+
+// PROTOTYPES
+void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
 
 // WINDOWS FUNCTIONS
 int GenerateRoads(WINDOW *win, int border, int yMax, int xMax)
@@ -164,33 +142,71 @@ void ClearWindow(WINDOW *win, int border, int yMax, int xMax)
     wrefresh(win);
 }
 
-void GameOver(WINDOW *win, Player *p, Timer t, int gameResult)
+void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
 {
     refresh();
-    usleep(1000*1000*3);
+    flushinp();
+    usleep(1000*1000*1);
     ClearWindow(win, 0, p->yMax, p->xMax);
+
+    int score = t.time * 100;
+    char name[] = "___";
     
     // remove the "game is woking!" from the top
     mvprintw(1, 0, "                        ");
-
-    mvwprintw(win, 10, 0, "Press any key to countinue... ");
+    refresh();
 
     // gameResult == 1      ->     game LOST
     // gameResult == 2      ->     game WON
-    if(gameResult ==    1)
+    if(gameResult == 1)
         mvwprintw(win, 0, 0, "GAME OVER!                              ");
-    else
+        
+    else if(gameResult == 2)
     {
         mvwprintw(win, 0, 0, "You WON!                                ");
-        mvwprintw(win, 1, 0, "SCORE:  %.f                         ", t.time*100);
+        mvwprintw(win, 1, 0, "SCORE:  %d                         ", score);
+        mvwprintw(win, 3, 0, "enter your name...");
+        mvwprintw(win, 4, 0, "%s", name);
+        wrefresh(win);
+        nodelay(win, false);
+        char key;
+        int i=0;
+        while(1)
+        {
+            flushinp();
+            key = wgetch(win);
+            if((key == 127) && i > 0)
+            {
+                name[i-1] = '_';
+                i--;
+                mvwprintw(win, 4, 0, "%s", name);
+                wrefresh(win);
+                continue;
+            }
+            else if((key >= 'a') && (key <= 'z') && i<3)
+            {
+                name[i] = key -'a' + 'A';
+                mvwprintw(win, 4, 0, "%s", name);
+                wrefresh(win);
+                i++;
+            }
+            if(key == 10 && i==3)
+                break;
+        }
     }
-      
+    mvwprintw(win, 7, 0, "Press any key to countinue... ");
     wrefresh(win);    
     flushinp();
     getch();
-    mvwprintw(win, 3, 0, "                                                                  ");
-    mvwprintw(win, 10, 0, "                                                                 ");
-    wrefresh(win);
+    // mvwprintw(win, 3, 0, "                               ");
+    // mvwprintw(win, 6, 0, "                               ");
+    if(gameResult == 2)
+    {
+        Ranking(win, p, l.lev_num, name, score);
+        wrefresh(win);
+        getch();
+    }
+    ClearWindow(win, 0, p->yMax, p->xMax);
 }
 
 WINDOW *StartLevel(int choice, Level l)
@@ -206,7 +222,6 @@ WINDOW *StartLevel(int choice, Level l)
 
     return win;
 }
-
 
 // MENU FUNCTIONS
 int Choice(int numlevels)
@@ -346,9 +361,10 @@ Car **CreateCars(int numroads, Level l)
     return cars;
 }
 
-Level CreateLevel(int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
+Level CreateLevel(int lev_num, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed, int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height, int map_width)
 {
     Level l;
+    l.lev_num = lev_num;
     l.min_car_len = min_car_len;
     l.max_car_len = max_car_len;
     l.cars_per_lane = cars_per_lane;
@@ -589,12 +605,13 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
             wrefresh(win);
             return 1;
         }
+        // return 2 if game won
         if(p->yPos == 0)
-            {
+        {
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
             wrefresh(win);
             return 2; 
-            }
+        }
         if(!p->isAttached)
             mvwaddch(win, p->yPos, p->xPos, p->symbol);
 
@@ -639,8 +656,56 @@ void ReadLevelConfig(int choice, Level *l)
     fscanf(f, "%*s%d", &map_height);
     fscanf(f, "%*s%d", &map_width);
 
-    *l = CreateLevel(min_car_len, max_car_len, cars_per_lane, car_min_speed, car_max_speed, car_stops_prob, car_friendly_prob, remove_car_prob, map_height, map_width);
+    *l = CreateLevel(choice, min_car_len, max_car_len, cars_per_lane, car_min_speed,
+                    car_max_speed, car_stops_prob, car_friendly_prob, remove_car_prob,
+                    map_height, map_width);
 
+    fclose(f);
+}
+
+void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
+{
+    char fname[12] = "rank_.txt";
+    fname[4] = levnum + '0';
+    char names[5][4];
+    int scores[5];
+    int score_used = 0;
+    FILE *f = fopen(fname, "r");
+    
+    //read ranking from file
+    for(int i=0; i<5; ++i)
+    {
+        fscanf(f, "%s %d", names[i], &scores[i]);
+    }
+    fclose(f);
+
+    // update the ranking
+    f = fopen(fname, "w");
+    for(int i=0; i<5; ++i)
+    {
+        if(score < scores[i] && !score_used)
+        {
+            fprintf(f, "%s %d\n", pname, score);
+            score_used = 1;
+            i--;
+        }
+        else
+            fprintf(f, "%s %d\n", names[i], scores[i]);
+    }
+    fclose(f);
+
+    //print the ranking out
+    ClearWindow(win, 0, p->yMax, p->xMax);
+    mvwprintw(win, 0, 0, "Best scores in level %d:", levnum);
+    f = fopen(fname, "r");
+    for(int i=0; i<5; ++i)
+    {
+        char name[4];
+        int score;
+        fscanf(f, "%s %d", names[i], &scores[i]);
+        mvwprintw(win, i+1, 0, "%d. %s: %d\n", i+1, names[i], scores[i]);
+    }
+    mvwprintw(win, 7, 0, "Press any key to countinue... ");
     fclose(f);
 }
 
@@ -658,7 +723,7 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         if(gameResult)
         {
             DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);   
-            GameOver(win, player, timer, gameResult);
+            GameOver(win, player, timer, l, gameResult);
             break;
         }
         DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);       
@@ -720,6 +785,7 @@ int main()
     }
     mvprintw(0, 0,"LEVEL %d             ", choice);
     mvprintw(1, 0,"FROG GAME IS WORKING!");
+    mvprintw(PLAYWIN_Y + yMax + 5, PLAYWIN_X, STUDENT_DATA);
     refresh();
     wrefresh(levelwin);
     MainLoop(levelwin, &player, timer, cars, numRoads, l);

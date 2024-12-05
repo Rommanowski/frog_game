@@ -7,5 +7,5 @@ car_max_speed 6
 car_stops_prob 1
 car_friendly_prob 2
 remove_car_prob 3  
-map_height 25
+map_height 8
 map_width 70
