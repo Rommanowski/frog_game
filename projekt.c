@@ -275,6 +275,7 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
                 if(fscanf(f, "%c", &ch) == EOF)
                 {
                     mvprintw(1, 0, "Press any key to continue...");
+                    flushinp();
                     getch();
                     ClearWindow(win, p->yMax, p->xMax);
                     wrefresh(win);
@@ -920,6 +921,8 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         {
             DisplayTimerInfo(stdscr, &timer, player->yMax, gameResult);   
             GameOver(win, player, timer, l, gameResult);
+            PlayReplay(win, player, f);
+            flushinp();
             break;
         }
         // display current time
@@ -945,7 +948,6 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         wrefresh(win);
         usleep(1000 * FRAME_TIME);
     }while(key = wgetch(win));
-    PlayReplay(win, player, f);
 }
 
 int main()
