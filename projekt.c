@@ -50,6 +50,16 @@
 #define RA(min, max) ( (min) + rand() % ((max) - (min) + 1) )       //used from ball.c
 
 
+//--------------NCURSES FUNCTIONS----------------------
+void StartCurses()
+{
+    initscr();
+    noecho();
+    cbreak();
+    curs_set(0);
+    start_color();
+}
+
 // -------------OBJECTS OBJECTS OBJECTS-----------------
 typedef struct{
     int xPos;
@@ -222,18 +232,18 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
         Ranking(win, p, l.lev_num, name, score);            // upload the name and the score to the ranking
     }
 
+    // exiting the ranking window
+
     mvwprintw(win, 7, 0, "Press any key to countinue... ");
     wrefresh(win);    
     flushinp();
     getch();
-    // mvwprintw(win, 3, 0, "                               ");
-    // mvwprintw(win, 6, 0, "                               ");
     ClearWindow(win, p->yMax, p->xMax);
 }
 
 WINDOW *StartLevel(int choice, Level l)
 {
-    WINDOW *win = newwin(l.map_height, l.map_width, PLAYWIN_Y, PLAYWIN_X);        //PLACEHOLDER VALUES
+    WINDOW *win = newwin(l.map_height, l.map_width, PLAYWIN_Y, PLAYWIN_X);
     //box(win, 0, 0);
 
     init_pair(GRASS_COL, COLOR_WHITE, COLOR_GREEN);
@@ -266,6 +276,13 @@ void AddReplayFrame(WINDOW *win, Player *p, FILE *f)
 void PlayReplay(WINDOW *win, Player *p, FILE *f)
 {
     f = fopen("replay.txt", "r");
+    if(f == NULL)                                               // check if file 'replay.txt' exists
+    {
+        mvprintw(0, 0, "replay file not found");
+        refresh();
+        return;
+    }
+    // prepare the replay window
     ClearWindow(win, p->yMax, p->xMax);
     mvprintw(1, 0, "REPLAY");
     mvprintw(5, 0, "Press R for replay, press any other key to continue");
@@ -273,9 +290,12 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
     char ch = getch();
     mvprintw(5, 0, "                                                   ");
     refresh();
+
+    // exit replay if player wishes to do so
     if(ch != 'r')
         return;
 
+    //run the replay
     mvprintw(2, 0, "Press ENTER to stop the replay");
     refresh();
     while(1)
@@ -286,7 +306,7 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
         {
             for(int j=0; j<=p->xMax; ++j)
             {   
-                if(fscanf(f, "%c", &ch) == EOF || stop == ENTER)
+                if(fscanf(f, "%c", &ch) == EOF || stop == ENTER)        // stop the replay if player wants to quit
                 {
                     mvprintw(1, 0, "Press any key to continue...");
                     mvprintw(2, 0, "                                ");
@@ -308,9 +328,37 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
     
 }
 
+// check if terminal window is large enough for the game
+int CheckTerminalSize(int yMax, int xMax, int stdrYMAX, int stdrXMAX)
+{
+    if((PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1 > stdrYMAX) || (PLAYWIN_X + xMax > stdrXMAX))
+    {
+        ClearWindow(stdscr, stdrYMAX, stdrXMAX);
+        mvprintw(0, 0, "TERMINAL WINDOW IS TOO SMALL FOR THIS LEVEL");
+        mvprintw(1, 0, "YOUR TERMINAL DIMENSIONS: %d x %d       GAME DIMENSIONS: %d x %d ", stdrYMAX, stdrXMAX, PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1, PLAYWIN_X + xMax);
+        getch();
+        endwin();
+        return 1;
+    }
+    return 0;
+}
+
+// print important info when game is running
+void PrintStatus(int yMax, int level)
+{
+    mvprintw(0, 0,"LEVEL %d             ", level);
+    mvprintw(1, 0,"FROG GAME IS WORKING!        ");
+    mvprintw(PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET, PLAYWIN_X, STUDENT_DATA);
+    refresh();
+}
+
 // --------------------MENU FUNCTIONS-----------------------
 int Choice(int numlevels)
 {
+    int yMax, xMax;
+    getmaxyx(stdscr, yMax, xMax);
+    ClearWindow(stdscr, yMax, xMax);
+    refresh();
     mvprintw(0, 0,"Choose the level:                 ");
     mvprintw(1, 0,"Press ESC to leave the game                                                           ");
     refresh();
@@ -354,7 +402,7 @@ int Choice(int numlevels)
 }
 
 // -------------------COLOR FUNCTIONS--------------------------
-// Two similar functions. They set the right color, useful when chaning position of player/stork
+// Three similar functions. They set the right color, useful when chaning position of player/stork/coloring the replay window
 // For better understanding, check GenerateRoads function
 void SetGoodColor(WINDOW *win, Player *p)
 {
@@ -502,7 +550,7 @@ Car **CreateCars(int numroads, Level l)
     return cars;
 }
 
-// this function creates a level with all the parameters from the inpu
+// this function creates a level with all the parameters from the input
 Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed,
                   int car_max_speed, int car_stops_prob, int car_friendly_prob, int remove_car_prob, int map_height,
                   int map_width, int isStork)
@@ -545,23 +593,27 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
         char ch_front= (mvwinch(win, car->lane, car->head) & A_CHARTEXT);
         if((ch_rear!= PLAYER_SYMBOL) && ch_rear!= STORK_SYMBOL)
             mvwaddch(win, car->lane, car->head-car->length, ' ');
+        // if car within map bordes
         if(car -> head <= p->xMax + car->length)
         {    
+            // choose right color depending on if the car is friendly
             if (car->isFriendly)
                 wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
             else
                 wattron(win, COLOR_PAIR(ROAD_COL));
             if(ch_front != STORK_SYMBOL)
-                if(!car->isFriendly)
+                // choose the right symbol depending on if the car is friendly
+                if(!car->isFriendly)        
                     mvwaddch(win, car->lane, car->head, CAR);
                 else
                     mvwaddch(win, car->lane, car->head, FCAR);
         }   
-        else
+        else    // if car exited the map
         {
-            if(RA(0, l.remove_car_prob) % l.remove_car_prob == 0 && !car->holdsPlayer)
+            // remove some cars, replacing them with a random car
+            if(RA(0, l.remove_car_prob) % l.remove_car_prob == 0 && !car->holdsPlayer)      // dont remove car if it holds the player
                 *car = CreateRandomCar(car->lane, car->lastFrameMoved, car->index, l);
-            else
+            else                                                                            // if car is not removed, it is moved all the way to the left
                 car->head = -1;
         }
         car->lastFrameMoved = t.frame_n;
@@ -818,7 +870,7 @@ void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
 
 // READING / WRITING TO FILES
 
-int ReadLevelConfig(int choice, Level *l)      // this function is 1005 characters long as of making this comment. Probably could be done shorter but it works.
+int ReadLevelConfig(int choice, Level *l)
 {
     char level_name[] = "levelX.txt";
     char level_number = '0'+choice;           // put levels number in place of X
@@ -833,36 +885,12 @@ int ReadLevelConfig(int choice, Level *l)      // this function is 1005 characte
         endwin();
         return -1;
     }
-    // level's attributes
-    int bush_prob;
-    int min_car_len;
-    int max_car_len;
-    int cars_per_lane;
-    int car_min_speed;
-    int car_max_speed;
-    int car_stops_prob;
-    int car_friendly_prob;
-    int remove_car_prob;
-    int map_height;
-    int map_width;
-    int isStork;
-    //skip the first string in a file input, since it's a variable name
-    fscanf(f, "%*s%d", &bush_prob);
-    fscanf(f, "%*s%d", &min_car_len);
-    fscanf(f, "%*s%d", &max_car_len);
-    fscanf(f, "%*s%d", &cars_per_lane);
-    fscanf(f, "%*s%d", &car_min_speed);
-    fscanf(f, "%*s%d", &car_max_speed);
-    fscanf(f, "%*s%d", &car_stops_prob);
-    fscanf(f, "%*s%d", &car_friendly_prob);
-    fscanf(f, "%*s%d", &remove_car_prob);
-    fscanf(f, "%*s%d", &map_height);
-    fscanf(f, "%*s%d", &map_width);
-    fscanf(f, "%*s%d", &isStork);
 
-    *l = CreateLevel(choice, bush_prob, min_car_len, max_car_len, cars_per_lane,
-                    car_min_speed, car_max_speed, car_stops_prob, car_friendly_prob,
-                    remove_car_prob, map_height, map_width, isStork);
+    int params[12];
+    for(int i=0; i<12; i++)
+        fscanf(f, "%*s%d", &params[i]);
+
+    *l = CreateLevel(choice, params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7], params[8], params[9], params[10], params[11]);
 
     fclose(f);
 }
@@ -980,11 +1008,7 @@ int main()
     while(1)
     {
     //ncurses start
-    initscr();
-    noecho();
-    cbreak();
-    curs_set(0);
-    start_color();
+    StartCurses();
 
     // choosing the level
     int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
@@ -996,22 +1020,18 @@ int main()
 
     // making the level window (dimensions taken from the config file)
     WINDOW *levelwin = StartLevel(choice, l);
+    nodelay(levelwin, true);                 // disable delay for playability
+
     int yMax, xMax;                          // level window dimensions
     getmaxyx(levelwin, yMax, xMax);
+
+    int numRoads = GenerateRoads(levelwin, l, yMax, xMax);      // generating roads, getting number of road lanes
+
     // check if window is big enough
     int stdrYMAX, stdrXMAX;
     getmaxyx(stdscr, stdrYMAX, stdrXMAX);
-    if((PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1 > stdrYMAX) || (PLAYWIN_X + xMax > stdrXMAX))
-    {
-        ClearWindow(stdscr, stdrYMAX, stdrXMAX);
-        mvprintw(0, 0, "TERMINAL WINDOW IS TOO SMALL FOR THIS LEVEL");
-        mvprintw(1, 0, "YOUR TERMINAL DIMENSIONS: %d x %d       GAME DIMENSIONS: %d x %d ", stdrYMAX, stdrXMAX, PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1, PLAYWIN_X + xMax);
-        getch();
-        endwin();
-        return 0;
-    }
-    nodelay(levelwin, true);                 // disable delay for playability
-    int numRoads = GenerateRoads(levelwin, l, yMax, xMax);      //number of road lanes
+    if(CheckTerminalSize(yMax, xMax, stdrYMAX, stdrXMAX))
+        return 1;
 
     // creating player
     Player player;
@@ -1023,7 +1043,7 @@ int main()
 
     // creating stork
     Stork s;
-    s = CreateStork(0, 0);
+    s = CreateStork(0, xMax-2);
 
     // creating cars
     Car **cars = CreateCars(numRoads, l);
@@ -1037,20 +1057,15 @@ int main()
         }
     }
     
-    // printing some info on the top of the screen
-    mvprintw(0, 0,"LEVEL %d             ", choice);
-    mvprintw(1, 0,"FROG GAME IS WORKING!        ");
-    mvprintw(PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET, PLAYWIN_X, STUDENT_DATA);
-    refresh();
-    wrefresh(levelwin);
+    // printing some info on the top of the screen and student data below the level window
+    PrintStatus(yMax, choice);
 
-    FILE *f = fopen("replay.txt", "w");
+    FILE *f = fopen("replay.txt", "w"); // opening the file where we will be saving the replay
 
-    // check i player wants to leave the game (while playing)
+    // RUNNING THE GAME
     int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s, f);
-    if(quit == -1)
+    if(quit == -1)  // check i player wants to leave the game (while playing)
         break;
-    //getch();
     endwin();
     }
 
