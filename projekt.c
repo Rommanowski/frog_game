@@ -105,6 +105,8 @@ typedef struct{
 // ------------------PROTOTYPES-----------------------
 void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score);
 
+void SetGoodColorReplay(WINDOW *win, Player *p, int y, char ch);
+
 // -----------------WINDOW FUNCTIONS-----------------
 int GenerateRoads(WINDOW *win, Level l, int yMax, int xMax)     // this function paints every lane the correct color
 {                                                               // and returns the number of lanes
@@ -246,6 +248,43 @@ WINDOW *StartLevel(int choice, Level l)
     return win;
 }
 
+void AddReplayFrame(WINDOW *win, Player *p, FILE *f)
+{
+    for(int i=0; i<p->yMax; ++i)
+    {
+        for(int j=0; j<p->xMax; ++j)
+        {
+            char ch = (mvwinch(win, i, j) & A_CHARTEXT);
+            fprintf(f, "%c", ch);
+        }
+        fprintf(f, "\n");
+    }
+}
+
+void PlayReplay(WINDOW *win, Player *p, FILE *f)
+{
+    f = fopen("replay.txt", "r");
+    char ch;
+    ClearWindow(win, p->yMax, p->xMax);
+    while(1)
+    {
+        for(int i=0; i<p->yMax; ++i)
+        {
+            for(int j=0; j<=p->xMax; ++j)
+            {   
+                fscanf(f, "%c", &ch);
+                SetGoodColorReplay(win, p, i, ch);
+                mvwaddch(win, i, j, ch);
+                // if(i == p->yMax - 1 && j== p->xMax)
+                //     return;
+            }
+        }
+        wrefresh(win);
+        usleep(1000 * FRAME_TIME);
+    }
+    fclose(f);
+}
+
 // --------------------MENU FUNCTIONS-----------------------
 int Choice(int numlevels)
 {
@@ -311,6 +350,30 @@ void SetGoodColorStork(WINDOW *win, Player *p, Stork *s)
         wattron(win, COLOR_PAIR(STORK_GRASS));
     else
         wattron(win, COLOR_PAIR(META_COL));
+}
+void SetGoodColorReplay(WINDOW *win, Player *p, int y, char ch)
+{
+    if(y % 2 == 1 && y <= p->yMax-3)
+        {
+            if(ch == STORK_SYMBOL)
+                wattron(win, COLOR_PAIR(STORK_ROAD));
+            else
+                wattron(win, COLOR_PAIR(ROAD_COL));
+        }
+
+    else if(y >0)
+        {
+            if(ch == BUSH_SYMBOL)
+                wattron(win, COLOR_PAIR(BUSH_COL));
+            else if(ch == STORK_SYMBOL)
+                wattron(win, COLOR_PAIR(STORK_GRASS));
+            else 
+            wattron(win, COLOR_PAIR(GRASS_COL));
+        }
+    else
+        {
+            wattron(win, COLOR_PAIR(META_COL));
+        }
 }
 
 // -----------------OBJECT FUNCTIONS------------------------
@@ -831,7 +894,7 @@ void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
 
 // ------------------MAIN LOOP---------------------
 
-int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l, Stork *s)
+int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads, Level l, Stork *s, FILE *f)
 {
     char key;
     do
@@ -871,7 +934,9 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
             }
         wrefresh(win);
         usleep(1000 * FRAME_TIME);
+        AddReplayFrame(win, player, f);
     }while(key = wgetch(win));
+    PlayReplay(win, player, f);
 }
 
 int main()
@@ -931,8 +996,10 @@ int main()
     refresh();
     wrefresh(levelwin);
 
+    FILE *f = fopen("replay.txt", "w");
+
     // check i player wants to leave the game (while playing)
-    int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s);
+    int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s, f);
     if(quit == -1)
         break;
     //getch();
