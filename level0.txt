@@ -5,8 +5,8 @@ cars_per_lane 6
 car_min_speed 4
 car_max_speed 8
 car_stops_prob 1
-car_friendly_prob 100000
+car_friendly_prob 3
 remove_car_prob 4  
-map_height 25  
-map_width 175
+map_height 20
+map_width 100
 isStork 0

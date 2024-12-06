@@ -9,11 +9,12 @@
 #include <time.h>
 
 #define STUDENT_DATA "Jakub Romanowski s203681"
+#define STUDENT_DATA_OFFSET 5   // student data will be shown 5 rows below the game
 
 #define NUMLEVELS 4         // number of levels
 
 #define ENTER 10            // non-letter keys in more readable form
-#define BACKSPACE 123
+#define BACKSPACE 127
 
 #define GRASS_COL 1
 #define ROAD_COL 2
@@ -264,17 +265,30 @@ void AddReplayFrame(WINDOW *win, Player *p, FILE *f)
 void PlayReplay(WINDOW *win, Player *p, FILE *f)
 {
     f = fopen("replay.txt", "r");
-    char ch;
     ClearWindow(win, p->yMax, p->xMax);
+    mvprintw(1, 0, "REPLAY");
+    mvprintw(5, 0, "Press R for replay, press any other key to continue");
+    refresh();
+    char ch = getch();
+    mvprintw(5, 0, "                                                   ");
+    refresh();
+    if(ch != 'r')
+        return;
+
+    mvprintw(2, 0, "Press ENTER to stop the replay");
+    refresh();
     while(1)
     {
+        nodelay(win, true);
+        char stop = wgetch(win);
         for(int i=0; i<p->yMax; ++i)
         {
             for(int j=0; j<=p->xMax; ++j)
             {   
-                if(fscanf(f, "%c", &ch) == EOF)
+                if(fscanf(f, "%c", &ch) == EOF || stop == ENTER)
                 {
                     mvprintw(1, 0, "Press any key to continue...");
+                    mvprintw(2, 0, "                                ");
                     flushinp();
                     getch();
                     ClearWindow(win, p->yMax, p->xMax);
@@ -285,8 +299,6 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
                 }
                 SetGoodColorReplay(win, p, i, ch);
                 mvwaddch(win, i, j, ch);
-                // if(i == p->yMax - 1 && j== p->xMax)
-                //     return;
             }
         }
         wrefresh(win);
@@ -854,7 +866,9 @@ void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
     // handling errors
     if( f == NULL)
     {
-        mvprintw(0, 5, "ERROR: config file not found! Check if a file rank%d.txt' exists in the game's folder", levnum);
+        mvprintw(0, 0, "ERROR: ranking file not found! Check if a file rank%d.txt' exists in the game's folder", levnum);
+        getch();
+        mvprintw(0, 0, "LEVEL %d                                                                                ", levnum);
         endwin();
         return;
     }
@@ -952,6 +966,7 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
 
 int main()
 {
+    srand(time(NULL));
     while(1)
     {
     //ncurses start
@@ -973,6 +988,18 @@ int main()
     WINDOW *levelwin = StartLevel(choice, l);
     int yMax, xMax;                          // level window dimensions
     getmaxyx(levelwin, yMax, xMax);
+    // check if window is big enough
+    int stdrYMAX, stdrXMAX;
+    getmaxyx(stdscr, stdrYMAX, stdrXMAX);
+    if((PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1 > stdrYMAX) || (PLAYWIN_X + xMax > stdrXMAX))
+    {
+        ClearWindow(stdscr, stdrYMAX, stdrXMAX);
+        mvprintw(0, 0, "TERMINAL WINDOW IS TOO SMALL FOR THIS LEVEL");
+        mvprintw(1, 0, "YOUR TERMINAL DIMENSIONS: %d x %d       GAME DIMENSIONS: %d x %d ", stdrYMAX, stdrXMAX, PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET + 1, PLAYWIN_X + xMax);
+        getch();
+        endwin();
+        return 0;
+    }
     nodelay(levelwin, true);                 // disable delay for playability
     int numRoads = GenerateRoads(levelwin, l, yMax, xMax);      //number of road lanes
 
@@ -986,7 +1013,7 @@ int main()
 
     // creating stork
     Stork s;
-    s = CreateStork(0, 160);
+    s = CreateStork(0, 0);
 
     // creating cars
     Car **cars = CreateCars(numRoads, l);
@@ -1003,7 +1030,7 @@ int main()
     // printing some info on the top of the screen
     mvprintw(0, 0,"LEVEL %d             ", choice);
     mvprintw(1, 0,"FROG GAME IS WORKING!        ");
-    mvprintw(PLAYWIN_Y + yMax + 5, PLAYWIN_X, STUDENT_DATA);
+    mvprintw(PLAYWIN_Y + yMax + STUDENT_DATA_OFFSET, PLAYWIN_X, STUDENT_DATA);
     refresh();
     wrefresh(levelwin);
 
