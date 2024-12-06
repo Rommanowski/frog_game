@@ -248,7 +248,7 @@ WINDOW *StartLevel(int choice, Level l)
 int Choice(int numlevels)
 {
     mvprintw(0, 0,"Choose the level:                 ");
-    mvprintw(1, 0,"Press ESC to leave the game       ");
+    mvprintw(1, 0,"Press ESC to leave the game                                                           ");
     refresh();
     
     // create a menu window with a box around it
@@ -721,7 +721,7 @@ void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
 
 // READING / WRITING TO FILES
 
-void ReadLevelConfig(int choice, Level *l)      // this function is 1005 characters long as of making this comment. Probably could be done shorter but it works.
+int ReadLevelConfig(int choice, Level *l)      // this function is 1005 characters long as of making this comment. Probably could be done shorter but it works.
 {
     char level_name[] = "levelX.txt";
     char level_number = '0'+choice;           // put levels number in place of X
@@ -731,9 +731,10 @@ void ReadLevelConfig(int choice, Level *l)      // this function is 1005 charact
     // handling errors
     if( f == NULL)
     {
-        printw("ERROR: config file not found! Check i a file level%d.txt' exists in the game's folder", choice);
+        mvprintw(1, 0, "ERROR: config file not found! Check if a file level%d.txt' exists in the game's folder", choice);
+        getch();
         endwin();
-        return;
+        return -1;
     }
     // level's attributes
     int bush_prob;
@@ -775,6 +776,13 @@ void Ranking(WINDOW *win, Player *p, int levnum, char *pname, int score)
     char fname[12] = "rankX.txt";
     fname[4] = levnum + '0';
     FILE *f = fopen(fname, "r");
+    // handling errors
+    if( f == NULL)
+    {
+        mvprintw(0, 5, "ERROR: config file not found! Check if a file rank%d.txt' exists in the game's folder", levnum);
+        endwin();
+        return;
+    }
 
     char names[5][6];       // matrix storing top 5 players and their names
     int scores[5];          // array storing top 5 scores
@@ -880,7 +888,8 @@ int main()
     if(choice == -1)                        //choice returns -1 if QUITKEY pressed
         break;
     Level l;
-    ReadLevelConfig(choice, &l);
+    if (ReadLevelConfig(choice, &l) == -1)
+        continue;
 
     // making the level window (dimensions taken from the config file)
     WINDOW *levelwin = StartLevel(choice, l);
