@@ -557,169 +557,171 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
     
     //------------------PLAYER MOVEMENT FUNCTIONS---------------------
     // the if statements prevent running outside the map or into a bush
-    void MvPlayerUp(WINDOW *win, Player *p)
+void MvPlayerUp(WINDOW *win, Player *p)
+{
+if((p->yPos > 0) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
     {
-    if((p->yPos > 0) && (mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
-        {
-            SetGoodColor(win, p);
-            mvwaddch(win, p->yPos, p->xPos, ' ');
-            p->yPos--;
-        }
-    }
-    void MvPlayerDown(WINDOW *win, Player *p)
-    {
-        if((p->yPos < p->yMax-1) && (mvwinch(win, p->yPos+1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
-        {
-            SetGoodColor(win, p);
-            mvwaddch(win, p->yPos, p->xPos, ' ');
-            p->yPos++;
-        }
-    }
-    void MvPlayerRight(WINDOW *win, Player *p)
-    {
-        if((p->xPos < p->xMax-1) && (mvwinch(win, p->yPos, p->xPos + 1) & A_CHARTEXT) != BUSH_SYMBOL)
-        {
-            SetGoodColor(win, p);
-            mvwaddch(win, p->yPos, p->xPos, ' ');
-            p->xPos++;
-        }
-    }
-    void MvPlayerLeft(WINDOW *win, Player *p)
-    {
-        if((p->xPos > 0) && (mvwinch(win, p->yPos, p->xPos - 1) & A_CHARTEXT) != BUSH_SYMBOL)
-        {
-            SetGoodColor(win, p);
-            mvwaddch(win, p->yPos, p->xPos, ' ');
-            p->xPos--;
-        }
-    }
-
-    int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
-    {
-        if(t.frame_n - p->lastFrameMoved >= Player_SPEED)       // move only when enough time has passed since the last movement
-        {
-            switch(key)
-            {
-                case 'w':
-                    if(!p->isAttached)
-                    {
-                    MvPlayerUp(win, p);
-                    p->lastFrameMoved = t.frame_n;
-                    }
-                    break;
-                case 's':
-                    if(!p->isAttached)
-                    {
-                    MvPlayerDown(win, p);
-                    p->lastFrameMoved = t.frame_n;
-                    }
-                    break;
-                case 'a':
-                    if(!p->isAttached)
-                    {
-                    MvPlayerLeft(win, p);
-                    p->lastFrameMoved = t.frame_n;
-                    }
-                    break;
-                case 'd':
-                    if(!p->isAttached)
-                    {
-                    MvPlayerRight(win, p);
-                    p->lastFrameMoved = t.frame_n;
-                    }
-                    break;
-                case ATTACH_KEY:
-                    // this long if statement check if player is attached (only then he can jump out), would not jump into a bush and if he is inside the map's bonds
-                    if((p->isAttached) && ((mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL) && (p->xPos >=0) && (p->xPos < p->xMax))
-                    {
-                        MvPlayerUp(win, p);
-                        p->isAttached = 0;
-                        cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
-                        p->lastFrameMoved = t.frame_n + Player_SPEED;
-                    }
-                    break;
-                case QUITKEY:       // return -1 (signal to quit the game) if QUITKEY pressed
-                    return -1;
-                    break;
-                default:
-                    break;
-            }
-        }
         SetGoodColor(win, p);
-
-        // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
-        // he ran into a car in the previous frame
-        char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
-
-        // if there is a car or stork in players position before he is placed, it means the the game has been lost
-        if(((ch == CAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
-        {
-            mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
-            wrefresh(win);
-            return 1;
-        }
-        // return 2 if game won
-        if(p->yPos == 0)
-        {
-            mvwaddch(win, p->yPos, p->xPos, p->symbol);
-            wrefresh(win);
-            return 2; 
-        }
-        // display player if he is not attached
-        // otherwise, he will be displayed by a function that moves a car he is attached to
-        if(!p->isAttached)
-            mvwaddch(win, p->yPos, p->xPos, p->symbol);
-
-        flushinp();         //to 'unclog' the input
-        return 0;
+        mvwaddch(win, p->yPos, p->xPos, ' ');
+        p->yPos--;
     }
-
-    // STORK movement
-    void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
+}
+void MvPlayerDown(WINDOW *win, Player *p)
+{
+    if((p->yPos < p->yMax-1) && (mvwinch(win, p->yPos+1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL)
     {
-        if(t.frame_n - s->lastFrameMoved >= STORK_SPEED)
-        {
-        int yMovement, xMovement;
-
-        if(s->yPos > p->yPos)
-            yMovement = -1;
-        else if(s->yPos < p->yPos)
-            yMovement = 1;
-        else
-            yMovement = 0;
-
-        if(s->xPos > p->xPos)
-            xMovement = -1;
-        else if (s->xPos < p->xPos)
-            xMovement = 1;
-        else
-            xMovement = 0;
-
-        // remove stork's trace before moving it
-        SetGoodColorStork(win, p, s);
-        if(s->lastSymbol == BUSH_SYMBOL)
-            wattron(win, COLOR_PAIR(BUSH_COL));
-        if(s->lastSymbol != CAR)
-            mvwaddch(win, s->yPos, s->xPos, s->lastSymbol);
-        else
-            mvwaddch(win, s->yPos, s->xPos, ' ');
-
-        // update stork's position, display it
-        s->yPos += yMovement;
-        s->xPos += xMovement;
-        s->lastSymbol = (mvwinch(win, s->yPos, s->xPos) & A_CHARTEXT);
-        SetGoodColorStork(win, p, s);
-        wattron(win, A_BOLD);
-        mvwaddch(win, s->yPos, s->xPos, STORK_SYMBOL);
-        wattroff(win, A_BOLD);
-        s->lastFrameMoved = t.frame_n;      // update storks timer
-        }
+        SetGoodColor(win, p);
+        mvwaddch(win, p->yPos, p->xPos, ' ');
+        p->yPos++;
     }
+}
+void MvPlayerRight(WINDOW *win, Player *p)
+{
+    if((p->xPos < p->xMax-1) && (mvwinch(win, p->yPos, p->xPos + 1) & A_CHARTEXT) != BUSH_SYMBOL)
+    {
+        SetGoodColor(win, p);
+        mvwaddch(win, p->yPos, p->xPos, ' ');
+        p->xPos++;
+    }
+}
+void MvPlayerLeft(WINDOW *win, Player *p)
+{
+    if((p->xPos > 0) && (mvwinch(win, p->yPos, p->xPos - 1) & A_CHARTEXT) != BUSH_SYMBOL)
+    {
+        SetGoodColor(win, p);
+        mvwaddch(win, p->yPos, p->xPos, ' ');
+        p->xPos--;
+    }
+}
+void MvPlayerGeneral(WINDOW *win, Player *p, Timer t, Car **cars, char key)
+{
+    switch(key)
+    {
+        case 'w':
+            if(!p->isAttached)
+            {
+            MvPlayerUp(win, p);
+            p->lastFrameMoved = t.frame_n;
+            }
+            break;
+        case 's':
+            if(!p->isAttached)
+            {
+            MvPlayerDown(win, p);
+            p->lastFrameMoved = t.frame_n;
+            }
+            break;
+        case 'a':
+            if(!p->isAttached)
+            {
+            MvPlayerLeft(win, p);
+            p->lastFrameMoved = t.frame_n;
+            }
+            break;
+        case 'd':
+            if(!p->isAttached)
+            {
+            MvPlayerRight(win, p);
+            p->lastFrameMoved = t.frame_n;
+            }
+            break;
+        case ATTACH_KEY:
+            // this long if statement check if player is attached (only then he can jump out), would not jump into a bush and if he is inside the map's bonds
+            if((p->isAttached) && ((mvwinch(win, p->yPos-1, p->xPos) & A_CHARTEXT) != BUSH_SYMBOL) && (p->xPos >=0) && (p->xPos < p->xMax))
+            {
+                MvPlayerUp(win, p);
+                p->isAttached = 0;
+                cars[(p->yPos-1)/2][p->attachedCarIndex].holdsPlayer=0;
+                p->lastFrameMoved = t.frame_n + Player_SPEED;
+            }
+            break;
+        default:
+            break;
+    }
+}
+int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
+{
+    if(t.frame_n - p->lastFrameMoved >= Player_SPEED)       // move only when enough time has passed since the last movement
+    {
+        MvPlayerGeneral(win, p, t, cars, key);
+        if(key == QUITKEY)
+            return -1;
+    }
+    SetGoodColor(win, p);
+
+    // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
+    // he ran into a car in the previous frame
+    char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
+
+    // if there is a car or stork in players position before he is placed, it means the the game has been lost
+    if(((ch == CAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
+    {
+        mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
+        wrefresh(win);
+        return 1;
+    }
+    // return 2 if game won
+    if(p->yPos == 0)
+    {
+        mvwaddch(win, p->yPos, p->xPos, p->symbol);
+        wrefresh(win);
+        return 2; 
+    }
+    // display player if he is not attached
+    // otherwise, he will be displayed by a function that moves a car he is attached to
+    if(!p->isAttached)
+        mvwaddch(win, p->yPos, p->xPos, p->symbol);
+
+    flushinp();         //to 'unclog' the input
+    return 0;
+}
+
+// STORK movement
+void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
+{
+    if(t.frame_n - s->lastFrameMoved >= STORK_SPEED)
+    {
+    int yMovement, xMovement;
+
+    if(s->yPos > p->yPos)
+        yMovement = -1;
+    else if(s->yPos < p->yPos)
+        yMovement = 1;
+    else
+        yMovement = 0;
+
+    if(s->xPos > p->xPos)
+        xMovement = -1;
+    else if (s->xPos < p->xPos)
+        xMovement = 1;
+    else
+        xMovement = 0;
+
+    // remove stork's trace before moving it
+    SetGoodColorStork(win, p, s);
+    if(s->lastSymbol == BUSH_SYMBOL)
+        wattron(win, COLOR_PAIR(BUSH_COL));
+    if(s->lastSymbol != CAR)
+        mvwaddch(win, s->yPos, s->xPos, s->lastSymbol);
+    else
+        mvwaddch(win, s->yPos, s->xPos, ' ');
+
+    // update stork's position, display it
+    s->yPos += yMovement;
+    s->xPos += xMovement;
+    s->lastSymbol = (mvwinch(win, s->yPos, s->xPos) & A_CHARTEXT);
+    SetGoodColorStork(win, p, s);
+    wattron(win, A_BOLD);
+    mvwaddch(win, s->yPos, s->xPos, STORK_SYMBOL);
+    wattroff(win, A_BOLD);
+    s->lastFrameMoved = t.frame_n;      // update storks timer
+    }
+}
 
 
 // READING / WRITING TO FILES
 
-void ReadLevelConfig(int choice, Level *l)
+void ReadLevelConfig(int choice, Level *l)      // this function is 1005 characters long as of making this comment. Probably could be done shorter but it works.
 {
     char level_name[] = "levelX.txt";
     char level_number = '0'+choice;           // put levels number in place of X
