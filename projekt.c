@@ -30,6 +30,7 @@
 #define PLAYER_SYMBOL '@'               // defining symbols
 #define STORK_SYMBOL 'V'
 #define CAR '>'
+#define FCAR '='
 
 #define Player_SPEED 4                  // defining speeds
 #define STORK_SPEED 8
@@ -380,7 +381,10 @@ void SetGoodColorReplay(WINDOW *win, Player *p, int y, char ch)
             if(ch == STORK_SYMBOL)
                 wattron(win, COLOR_PAIR(STORK_ROAD));
             else
-                wattron(win, COLOR_PAIR(ROAD_COL));
+                if(ch == FCAR)
+                    wattron(win, COLOR_PAIR(FRIENDLY_CAR_COL));
+                else
+                    wattron(win, COLOR_PAIR(ROAD_COL));
         }
 
     else if(y >0)
@@ -548,8 +552,11 @@ void MoveCar(WINDOW *win, Player *p, Car *car, Timer t, Level l)
             else
                 wattron(win, COLOR_PAIR(ROAD_COL));
             if(ch_front != STORK_SYMBOL)
-                mvwaddch(win, car->lane, car->head, CAR);
-        }
+                if(!car->isFriendly)
+                    mvwaddch(win, car->lane, car->head, CAR);
+                else
+                    mvwaddch(win, car->lane, car->head, FCAR);
+        }   
         else
         {
             if(RA(0, l.remove_car_prob) % l.remove_car_prob == 0 && !car->holdsPlayer)
@@ -605,7 +612,10 @@ int DisplayCar(WINDOW *win, Car *car, Player *p, Timer t, char key, Level l)
     // this loop reassures that when one car is surpassing another, there will be no blank space between them on screen
     for(int i=car->head; i>car->head-car->length+1; --i)
         if(i >= 0 && ((mvwinch(win, car->lane, i) & A_CHARTEXT) != STORK_SYMBOL))       // don't cover the stork - it should be visible all the time
-            mvwaddch(win, car->lane, i, CAR);
+            if(!car->isFriendly)
+                mvwaddch(win, car->lane, i, CAR);
+            else
+                mvwaddch(win, car->lane, i, FCAR);
  
     // some cars stop when the frog is trying to get across the street
     // Checking if player is next to the car, below it
@@ -741,7 +751,7 @@ int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
     char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
 
     // if there is a car or stork in players position before he is placed, it means the the game has been lost
-    if(((ch == CAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
+    if(((ch == CAR) || (ch == FCAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
     {
         mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
         wrefresh(win);
@@ -788,7 +798,7 @@ void MoveStork(WINDOW *win, Stork *s, Player *p, Timer t)
     SetGoodColorStork(win, p, s);
     if(s->lastSymbol == BUSH_SYMBOL)
         wattron(win, COLOR_PAIR(BUSH_COL));
-    if(s->lastSymbol != CAR)
+    if(s->lastSymbol != CAR && s->lastSymbol != FCAR)
         mvwaddch(win, s->yPos, s->xPos, s->lastSymbol);
     else
         mvwaddch(win, s->yPos, s->xPos, ' ');
