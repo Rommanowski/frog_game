@@ -272,7 +272,16 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
         {
             for(int j=0; j<=p->xMax; ++j)
             {   
-                fscanf(f, "%c", &ch);
+                if(fscanf(f, "%c", &ch) == EOF)
+                {
+                    mvprintw(1, 0, "Press any key to continue...");
+                    getch();
+                    ClearWindow(win, p->yMax, p->xMax);
+                    wrefresh(win);
+                    fclose(f);
+                    mvprintw(1, 0, "                            ");
+                    return;
+                }
                 SetGoodColorReplay(win, p, i, ch);
                 mvwaddch(win, i, j, ch);
                 // if(i == p->yMax - 1 && j== p->xMax)
@@ -282,7 +291,7 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
         wrefresh(win);
         usleep(1000 * FRAME_TIME);
     }
-    fclose(f);
+    
 }
 
 // --------------------MENU FUNCTIONS-----------------------
@@ -902,6 +911,7 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
         // function 'DisplayPlayer' returns 0 if game should still be running,
         // 1 if game is lost, 2 if game is won, -1 if player wants to EXIT
         int gameResult = DisplayPlayer(win, player, timer, cars, key);
+        AddReplayFrame(win, player, f);
         if(gameResult == -1)
             return -1;
         
@@ -934,7 +944,6 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
             }
         wrefresh(win);
         usleep(1000 * FRAME_TIME);
-        AddReplayFrame(win, player, f);
     }while(key = wgetch(win));
     PlayReplay(win, player, f);
 }
