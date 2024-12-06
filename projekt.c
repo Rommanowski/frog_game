@@ -1,4 +1,6 @@
-//JAKUB ROMANOWSKI
+// JAKUB ROMANOWSKI s203681
+// i only used the "RA" macro from ball.c (the example code from Moodle)
+// function name 'MainLoop' is also the same, but the function itself is different
 
 #include <stdio.h>
 #include <ncurses.h>
