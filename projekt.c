@@ -790,6 +790,19 @@ void MvPlayerGeneral(WINDOW *win, Player *p, Timer t, Car **cars, char key)
 }
 int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
 {
+    // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
+    // he ran into a car in the previous frame
+    char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
+
+    // if there is a car or stork in players position before he is placed, it means the the game has been lost
+    if(((ch == CAR) || (ch == FCAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
+    {
+        SetGoodColor(win, p);
+        mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
+        wrefresh(win);
+        return 1;
+    }
+
     if(t.frame_n - p->lastFrameMoved >= Player_SPEED)       // move only when enough time has passed since the last movement
     {
         MvPlayerGeneral(win, p, t, cars, key);
@@ -798,17 +811,6 @@ int DisplayPlayer(WINDOW *win, Player *p, Timer t, Car **cars, char key)
     }
     SetGoodColor(win, p);
 
-    // Cars are updated after the player, so if there is a car symbol at player's position before he is displayed, that means
-    // he ran into a car in the previous frame
-    char ch = (mvwinch(win, p->yPos, p->xPos) & A_CHARTEXT);
-
-    // if there is a car or stork in players position before he is placed, it means the the game has been lost
-    if(((ch == CAR) || (ch == FCAR) || (ch == STORK_SYMBOL)) && !p->isAttached)
-    {
-        mvwaddch(win, p->yPos, p->xPos, p->symbol);     // display the player so his last position is known
-        wrefresh(win);
-        return 1;
-    }
     // return 2 if game won
     if(p->yPos == 0)
     {
