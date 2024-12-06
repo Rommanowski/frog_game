@@ -21,6 +21,7 @@
 #define BUSH_COL 6
 #define STORK_GRASS 7
 #define STORK_ROAD 8
+#define STORK_COL 9
 
 #define BUSH_SYMBOL 'O'
 #define PLAYER_SYMBOL '@'               // defining symbols
@@ -235,8 +236,10 @@ WINDOW *StartLevel(int choice, Level l)
     init_pair(BLACK_COL, COLOR_WHITE, COLOR_BLACK);
     init_pair(FRIENDLY_CAR_COL, COLOR_BLUE, COLOR_YELLOW);
     init_pair(BUSH_COL, COLOR_BLACK, COLOR_GREEN);
-    init_pair(STORK_GRASS, COLOR_RED, COLOR_GREEN);
-    init_pair(STORK_ROAD, COLOR_RED, COLOR_YELLOW);
+    init_color(STORK_COL, 1000, 1000, 0); // Yellow color with full red and green
+
+    init_pair(STORK_GRASS, STORK_COL, COLOR_GREEN);
+    init_pair(STORK_ROAD, STORK_COL, COLOR_YELLOW);
 
     return win;
 }
@@ -706,7 +709,9 @@ void DisplayTimerInfo(WINDOW *win, Timer *t, int yMax, int hide)
         s->xPos += xMovement;
         s->lastSymbol = (mvwinch(win, s->yPos, s->xPos) & A_CHARTEXT);
         SetGoodColorStork(win, p, s);
+        wattron(win, A_BOLD);
         mvwaddch(win, s->yPos, s->xPos, STORK_SYMBOL);
+        wattroff(win, A_BOLD);
         s->lastFrameMoved = t.frame_n;      // update storks timer
         }
     }
