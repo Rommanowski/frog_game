@@ -530,25 +530,40 @@ Stork CreateStork(int yPos, int xPos)
 Car **CreateCars(int numroads, Level l)
 {
     Car **cars = (Car **)malloc(numroads * sizeof(Car *));  // allocate memory for rows of cars' matrix (one row for every road lane)
-    for(int i=0; i<numroads; ++i)
-    {
-        cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));     // numbers of cars in a row should equal car_per_lane (number from config file)
+    if (cars == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for cars matrix.\n");
+        exit(EXIT_FAILURE); // Handle error appropriately
+    }
+
+    for (int i = 0; i < numroads; ++i) {
+        cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));  // Allocate memory for each lane
+        if (cars[i] == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for lane %d.\n", i);
+            // Free previously allocated memory
+            for (int k = 0; k < i; ++k) {
+                free(cars[k]);
+            }
+            free(cars);
+            exit(EXIT_FAILURE); // Handle error appropriately
+        }
 
         // creating a random car
-        for(int j=0; j<l.cars_per_lane; ++j)
-        {
+        for (int j = 0; j < l.cars_per_lane; ++j) {
             int randomSpeed = RA(l.car_min_speed, l.car_max_speed);
             int randomLength = RA(l.min_car_len, l.max_car_len);
-            int randomHead = RA(j*l.map_width/l.cars_per_lane, (j+1)*l.map_width/l.cars_per_lane - randomLength);   // cars are placed randomly, but this weird equation makes the layou more even
-            int randomNotStops = RA(0, l.car_stops_prob)%l.car_stops_prob;
-            int randomNotFriendly = RA(0, l.car_friendly_prob)%l.car_friendly_prob;
-            int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB)%CHANGES_SPEED_PROB;
-            cars[i][j] = CreateCar(randomHead, 1+(2*i), randomLength, randomSpeed, !randomNotStops,
-                                   !randomNotFriendly, j, randomNotChangesSpeed, 0);
+            int randomHead = RA(j * l.map_width / l.cars_per_lane, 
+                                (j + 1) * l.map_width / l.cars_per_lane - randomLength); // cars are placed randomly, but this weird equation makes the layout more even
+            int randomNotStops = RA(0, l.car_stops_prob) % l.car_stops_prob;
+            int randomNotFriendly = RA(0, l.car_friendly_prob) % l.car_friendly_prob;
+            int randomNotChangesSpeed = RA(0, CHANGES_SPEED_PROB) % CHANGES_SPEED_PROB;
+
+            cars[i][j] = CreateCar(randomHead, 1 + (2 * i), randomLength, randomSpeed, 
+                                   !randomNotStops, !randomNotFriendly, j, randomNotChangesSpeed, 0);
         }
     }
     return cars;
 }
+
 
 // this function creates a level with all the parameters from the input
 Level CreateLevel(int lev_num, int bush_prob, int min_car_len, int max_car_len, int cars_per_lane, int car_min_speed,
@@ -1004,71 +1019,79 @@ int MainLoop(WINDOW *win, Player *player, Timer timer, Car **cars, int numroads,
     }while(key = wgetch(win));
 }
 
-int main()
-{
+#include <stdlib.h> // For free()
+
+int main() {
     srand(time(NULL));
-    while(1)
-    {
-    //ncurses start
-    StartCurses();
+    while (1) {
+        // ncurses start
+        StartCurses();
 
-    // choosing the level
-    int choice = Choice(NUMLEVELS);         // choice -> a variable   Choice -> a function
-    if(choice == -1)                        //choice returns -1 if QUITKEY pressed
-        break;
-    Level l;
-    if (ReadLevelConfig(choice, &l) == -1)
-        continue;
+        // choosing the level
+        int choice = Choice(NUMLEVELS); // choice -> a variable, Choice -> a function
+        if (choice == -1) // choice returns -1 if QUITKEY pressed
+            break;
 
-    // making the level window (dimensions taken from the config file)
-    WINDOW *levelwin = StartLevel(choice, l);
-    nodelay(levelwin, true);                 // disable delay for playability
+        Level l;
+        if (ReadLevelConfig(choice, &l) == -1)
+            continue;
 
-    int yMax, xMax;                          // level window dimensions
-    getmaxyx(levelwin, yMax, xMax);
+        // making the level window (dimensions taken from the config file)
+        WINDOW *levelwin = StartLevel(choice, l);
+        nodelay(levelwin, true); // disable delay for playability
 
-    int numRoads = GenerateRoads(levelwin, l, yMax, xMax);      // generating roads, getting number of road lanes
+        int yMax, xMax; // level window dimensions
+        getmaxyx(levelwin, yMax, xMax);
 
-    // check if window is big enough
-    int stdrYMAX, stdrXMAX;
-    getmaxyx(stdscr, stdrYMAX, stdrXMAX);
-    if(CheckTerminalSize(yMax, xMax, stdrYMAX, stdrXMAX))
-        return 1;
+        int numRoads = GenerateRoads(levelwin, l, yMax, xMax); // generating roads, getting number of road lanes
 
-    // creating player
-    Player player;
-    player = CreatePlayer(yMax-2, xMax/2, yMax, xMax, PLAYER_SYMBOL);
-
-    // creating timer
-    Timer timer;
-    timer = CreateTimer();
-
-    // creating stork
-    Stork s;
-    s = CreateStork(0, xMax-2);
-
-    // creating cars
-    Car **cars = CreateCars(numRoads, l);
-
-    // placing cars in their initial position
-    for(int i=0; i<numRoads; ++i)
-    {
-        for(int j=0; j<l.cars_per_lane; ++j)
-        {
-            PlaceCar(levelwin, &cars[i][j], &player);
+        // check if window is big enough
+        int stdrYMAX, stdrXMAX;
+        getmaxyx(stdscr, stdrYMAX, stdrXMAX);
+        if (CheckTerminalSize(yMax, xMax, stdrYMAX, stdrXMAX)) {
+            endwin();
+            return 1;
         }
-    }
-    
-    // printing some info on the top of the screen and student data below the level window
-    PrintStatus(yMax, choice);
 
-    FILE *f = fopen("replay.txt", "w"); // opening the file where we will be saving the replay
+        // creating player
+        Player player = CreatePlayer(yMax - 2, xMax / 2, yMax, xMax, PLAYER_SYMBOL);
 
-    // RUNNING THE GAME
-    int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s, f);
-    if(quit == -1)  // check i player wants to leave the game (while playing)
-        break;
-    endwin();
+        // creating timer
+        Timer timer = CreateTimer();
+
+        // creating stork
+        Stork s = CreateStork(0, xMax - 2);
+
+        // creating cars
+        Car **cars = CreateCars(numRoads, l);
+
+        // placing cars in their initial position
+        for (int i = 0; i < numRoads; ++i) {
+            for (int j = 0; j < l.cars_per_lane; ++j) {
+                PlaceCar(levelwin, &cars[i][j], &player);
+            }
+        }
+
+        // printing some info on the top of the screen and student data below the level window
+        PrintStatus(yMax, choice);
+
+        FILE *f = fopen("replay.txt", "w"); // opening the file where we will be saving the replay
+
+        // RUNNING THE GAME
+        int quit = MainLoop(levelwin, &player, timer, cars, numRoads, l, &s, f);
+
+        fclose(f); // Close the replay file
+
+        // Free dynamically allocated memory
+        for (int i = 0; i < numRoads; ++i) {
+            free(cars[i]); // Free each lane
+        }
+        free(cars); // Free the array of pointers
+
+        if (quit == -1) // check if player wants to leave the game (while playing)
+            break;
+
+        endwin();
     }
 
     endwin();
