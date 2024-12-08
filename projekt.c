@@ -51,6 +51,7 @@
 
 
 //--------------NCURSES FUNCTIONS----------------------
+
 void StartCurses()
 {
     initscr();
@@ -61,6 +62,9 @@ void StartCurses()
 }
 
 // -------------OBJECTS OBJECTS OBJECTS-----------------
+
+// Player (contains his position, last frame moved, which car he is attached to)
+// yMax and xMax are the bonds of level window.
 typedef struct{
     int xPos;
     int yPos;
@@ -73,11 +77,14 @@ typedef struct{
 
 } Player;
 
+
+// timer (counts time and frames)
 typedef struct{
     float time;
     int frame_n;
 } Timer;
 
+// this struct contains parameters of cars
 typedef struct{
     int head;
     int lane;
@@ -91,6 +98,7 @@ typedef struct{
     int lastFrameMoved;         //frame at which the car has moved for the last time (used for changing car speeds)
 } Car;
 
+// Struct 'Level' contains information from config file
 typedef struct{
     int lev_num;
     int bush_prob;
@@ -195,7 +203,7 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
     //if game won
     else if(gameResult == 2)
     {
-        char name[] = "_____";          // initial state of the name that will be inputed into the ranking
+        char name[] = "_____";          // initial state of the name that will later be inputed into the ranking
 
         mvwprintw(win, 0, 0, "You WON!                                ");
         mvwprintw(win, 1, 0, "SCORE:  %d                         ", score);
@@ -226,7 +234,7 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
                 wrefresh(win);
                 i++;
             }
-            if(key == 10 && i==5)
+            if(key == ENTER && i==5)                        // accept the name only if it's filled
                 break;
         }
         Ranking(win, p, l.lev_num, name, score);            // upload the name and the score to the ranking
@@ -241,6 +249,7 @@ void GameOver(WINDOW *win, Player *p, Timer t, Level l, int gameResult)
     ClearWindow(win, p->yMax, p->xMax);
 }
 
+// create game window, initialize color pairs
 WINDOW *StartLevel(int choice, Level l)
 {
     WINDOW *win = newwin(l.map_height, l.map_width, PLAYWIN_Y, PLAYWIN_X);
@@ -260,6 +269,7 @@ WINDOW *StartLevel(int choice, Level l)
     return win;
 }
 
+// print the whole game window to the replay file
 void AddReplayFrame(WINDOW *win, Player *p, FILE *f)
 {
     for(int i=0; i<p->yMax; ++i)
@@ -273,6 +283,7 @@ void AddReplayFrame(WINDOW *win, Player *p, FILE *f)
     }
 }
 
+// play the replay file
 void PlayReplay(WINDOW *win, Player *p, FILE *f)
 {
     f = fopen("replay.txt", "r");
@@ -291,7 +302,7 @@ void PlayReplay(WINDOW *win, Player *p, FILE *f)
     mvprintw(5, 0, "                                                   ");
     refresh();
 
-    // exit replay if player wishes to do so
+    // Play replay if player wishes to do so (presses R)
     if(ch != 'r')
         return;
 
@@ -530,21 +541,23 @@ Stork CreateStork(int yPos, int xPos)
 Car **CreateCars(int numroads, Level l)
 {
     Car **cars = (Car **)malloc(numroads * sizeof(Car *));  // allocate memory for rows of cars' matrix (one row for every road lane)
-    if (cars == NULL) {
+    if (cars == NULL)
+    {
         fprintf(stderr, "Error: Memory allocation failed for cars matrix.\n");
-        exit(EXIT_FAILURE); // Handle error appropriately
+        exit(EXIT_FAILURE); // exit game
     }
 
-    for (int i = 0; i < numroads; ++i) {
+    for (int i = 0; i < numroads; ++i)
+    {
         cars[i] = (Car *)malloc(l.cars_per_lane * sizeof(Car));  // Allocate memory for each lane
-        if (cars[i] == NULL) {
+        if (cars[i] == NULL)
+        {
             fprintf(stderr, "Error: Memory allocation failed for lane %d.\n", i);
             // Free previously allocated memory
-            for (int k = 0; k < i; ++k) {
+            for (int k = 0; k < i; ++k)
                 free(cars[k]);
-            }
             free(cars);
-            exit(EXIT_FAILURE); // Handle error appropriately
+            exit(EXIT_FAILURE); // exit game
         }
 
         // creating a random car
