@@ -2,6 +2,8 @@
 
 Welcome to the **NCurses Game**, a console-based game built using the `ncurses` library. This project demonstrates how to create an interactive and visually engaging game entirely within the terminal.
 
+Video demonstration: https://youtu.be/RcCAvz4A3r0
+
 ## About the game
 
 The game is about a frog trying to pass the street. The difficulties are:
